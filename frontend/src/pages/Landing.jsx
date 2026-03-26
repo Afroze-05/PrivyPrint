@@ -5,6 +5,7 @@ import bgGif from "../assets/bg2.gif";
 import { Shield, Printer, Lock, FileText } from "lucide-react";
 console.log(motion);
 
+
 function Landing() {
   const navigate = useNavigate();
   const targetRef = useRef(null);
