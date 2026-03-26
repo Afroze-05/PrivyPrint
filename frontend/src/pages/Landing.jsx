@@ -1,9 +1,12 @@
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import bgGif from "../assets/bg2.gif";
 import { Shield, Printer, Lock, FileText } from "lucide-react";
 console.log(motion);
+
+// Fallback background image (so the app always builds even if bg2.gif isn't present).
+const bgGif =
+  "data:image/gif;base64,R0lGODlhAQABAAAAACw="; // 1x1 transparent gif
 
 
 function Landing() {
@@ -69,13 +72,16 @@ function Landing() {
                rounded-[2rem] bg-[#26333B]/30 backdrop-blur-xs"
           >
             <h1
-              style={{ fontFamily: "BlockForce" }}
+              style={{
+                fontFamily:
+                  '"BlockForce", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif',
+              }}
               className="text-7xl md:text-9xl font-block-force tracking-tighter text-[#D91828] uppercase drop-shadow-2xl"
             >
               Privy<span className="text-[#3BBCD9]">Print</span>
             </h1>
             <p className="text-lg md:text-xl font-bold text-[#3BBCD9] tracking-[0.5em] uppercase opacity-80">
-              Secured Documentation Protocol
+              Privacy-Protected Printing System
             </p>
           </motion.div>
         </section>
@@ -140,12 +146,20 @@ function Landing() {
               <span className="text-[#D91828]">Secure Print</span>
             </h2>
 
-            <button
-              onClick={() => navigate("/signup")}
-              className="bg-[#D91828] text-white px-14 py-5 font-black uppercase tracking-widest hover:bg-[#3BBCD9] transition-all transform hover:scale-105 active:scale-95"
-            >
-              Create Account
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <button
+                onClick={() => navigate("/signup")}
+                className="bg-[#D91828] text-white px-14 py-5 font-black uppercase tracking-widest hover:bg-[#3BBCD9] transition-all transform hover:scale-105 active:scale-95"
+              >
+                START
+              </button>
+              <button
+                onClick={() => navigate("/admin/login")}
+                className="bg-[#3BBCD9] text-[#26333B] px-14 py-5 font-black uppercase tracking-widest hover:bg-[#D91828] transition-all transform hover:scale-105 active:scale-95"
+              >
+                Admin Login
+              </button>
+            </div>
           </div>
         </motion.section>
       </div>
