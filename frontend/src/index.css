@@ -2,14 +2,195 @@
 @tailwind components; */
 @tailwind utilities;
 
-@font-face {
-  font-family: "BlockForce";
-  /* Ensure the filename matches exactly what is in assets/fonts/ */
-  src: url("./assets/fonts/block-force.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
+.font-block-force {
+  /* Font file may not be present in every environment; always fall back safely. */
+  font-family:
+    "BlockForce",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    "Noto Sans",
+    "Helvetica Neue",
+    sans-serif;
 }
 
-.font-block-force {
-  font-family: "BlockForce";
+:root {
+  --sp-blue: #1f6feb;
+  --sp-blue-2: #3bbcd9;
+  --sp-beige: #f5f1e6;
+  --sp-beige-2: #efe6d3;
+  --sp-ink: #0f172a;
+  --sp-muted: rgba(15, 23, 42, 0.7);
+  --sp-border: rgba(15, 23, 42, 0.12);
+  --sp-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --sp-radius: 18px;
 }
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, var(--sp-beige) 0%, #ffffff 55%);
+  color: var(--sp-ink);
+}
+
+.sp-page {
+  min-height: 100vh;
+  padding: 28px 16px 48px;
+}
+
+.sp-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.sp-card {
+  background: rgba(245, 241, 230, 0.75);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  box-shadow: var(--sp-shadow);
+  padding: 22px;
+}
+
+.sp-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 820px) {
+  .sp-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sp-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.12s ease, background 0.12s ease;
+}
+
+.sp-btn:active {
+  transform: scale(0.98);
+}
+
+.sp-btn-primary {
+  background: var(--sp-blue);
+  color: #fff;
+}
+
+.sp-btn-primary:hover {
+  filter: brightness(1.03);
+}
+
+.sp-btn-secondary {
+  background: #fff;
+  border-color: var(--sp-border);
+}
+
+.sp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.sp-btn-danger {
+  background: #ef4444;
+  color: #fff;
+}
+
+.sp-input,
+.sp-select {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--sp-border);
+  background: rgba(255, 255, 255, 0.8);
+  outline: none;
+}
+
+.sp-label {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.sp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.sp-divider {
+  height: 1px;
+  background: var(--sp-border);
+  margin: 16px 0;
+}
+
+.sp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+  color: var(--sp-muted);
+}
+
+.sp-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 1000;
+}
+
+.sp-popup-inner {
+  width: min(560px, 100%);
+  background: #fff;
+  border: 1px solid var(--sp-border);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: var(--sp-shadow);
+}
+
+.sp-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--sp-border);
+}
+
+.sp-table th,
+.sp-table td {
+  text-align: left;
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  font-weight: 600;
+}
+
+.sp-table th {
+  background: rgba(59, 188, 217, 0.12);
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.sp-table tr:last-child td {
+  border-bottom: none;
+}
+
