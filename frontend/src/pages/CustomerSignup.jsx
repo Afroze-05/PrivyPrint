@@ -20,7 +20,8 @@ const GLOBAL_CSS = `
     justify-content: center;
     padding: 2rem;
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
+overflow-y: auto;
   }
 
   /* Ambient blobs */

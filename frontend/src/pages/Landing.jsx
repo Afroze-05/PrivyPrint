@@ -584,15 +584,16 @@ function Landing() {
           </div>
 
           {/* Main heading */}
-          <div style={{ textAlign: 'center' }}>
-            <h2 className="lp-section-h" style={{ color: '#D9910D', fontSize: 'clamp(4rem, 9vw, 8rem)' }}>
+          <div style={{ textAlign: 'center', marginTop: '-2rem' }}>
+            <h2 className="lp-section-h" style={{ color: '#D9910D', fontSize: 'clamp(4rem, 9vw, 4rem)' }}>
               Locked<br /><span style={{ color: '#D91828' }}>Pad.</span>
             </h2>
           </div>
 
           {/* Stats row */}
-          <div className="lp-stats-grid" style={{ width: '100%', maxWidth: '680px' }}>
-            <div className="lp-stat-cell">
+          <div className="lp-stats-grid" style={{ width: '100%', maxWidth: '680px' , height: '160px', marginBottom: '2.5rem', marginTop: '-2rem' }}>
+            <div className="lp-stat-cell"
+            >
               <div className="lp-stat-val" style={{ color: '#3BBCD9' }}>AES</div>
               <div style={{
                 fontFamily: "'DM Mono', monospace",
@@ -619,11 +620,11 @@ function Landing() {
           </div>
 
           {/* Protocol list */}
-          <div style={{ width: '100%', maxWidth: '680px' }}>
+          <div style={{ width: '100%', maxWidth: '680px',height: 'auto', padding: '0 1rem', marginTop: '-4rem' }}>
             <div style={{
               fontFamily: "'DM Mono', monospace",
               fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.2)', marginBottom: '0.75rem',
+              color: 'rgba(255,255,255,0.2)', marginBottom: '0.75rem', 
             }}>
               Active Protocols
             </div>
@@ -681,7 +682,7 @@ function Landing() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '1.75rem',
             }}>
-              <FileText size={22} color="#D91828" />
+              <FileText size={24} color="#F87171" />
             </div>
 
             {/* Heading */}

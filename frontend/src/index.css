@@ -210,10 +210,12 @@ body {
   box-shadow: var(--sp-shadow);
 }
 
+
 .sp-table {
   width: 100%;
   border-collapse: collapse;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   border-radius: 14px;
   border: 1px solid var(--sp-border);
 }
