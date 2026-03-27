@@ -688,7 +688,7 @@ function Landing() {
             {/* Heading */}
             <h2 className="lp-cta-h">
               Initialize<br />
-              <span>Secure</span> Print
+              <span>Privy</span> Print
             </h2>
 
             {/* Subtext */}

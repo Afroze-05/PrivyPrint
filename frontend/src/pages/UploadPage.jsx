@@ -398,7 +398,7 @@ export default function UploadPage() {
           <div className="up-header">
             <div className="up-logo">
               <div className="up-logo-dot" />
-              <span className="up-logo-text">SECUREPRINT · UPLOAD</span>
+              <span className="up-logo-text">PRIVYPRINT · UPLOAD</span>
             </div>
             <h1 className="up-title">
               Upload<br /><span>Document</span>
