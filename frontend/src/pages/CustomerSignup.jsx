@@ -29,7 +29,7 @@ export default function CustomerSignup() {
       const { token, user } = loginRes.data;
 
       setAuth({ token, ...user });
-      navigate("/home");
+      navigate("/upload");
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Signup failed.");
     } finally {
@@ -41,7 +41,7 @@ export default function CustomerSignup() {
     <div className="sp-page">
       <div className="sp-container">
         <div className="sp-card" style={{ maxWidth: 560, margin: "0 auto" }}>
-          <h2 style={{ marginTop: 0 }}>Customer Signup</h2>
+          <h2 style={{ marginTop: 0 }}>Customer Signup/Login</h2>
           <div className="sp-divider" />
 
           <form onSubmit={handleCreateAccount}>

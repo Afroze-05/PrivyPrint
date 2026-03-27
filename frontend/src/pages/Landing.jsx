@@ -83,6 +83,12 @@ function Landing() {
             <p className="text-lg md:text-xl font-bold text-[#3BBCD9] tracking-[0.5em] uppercase opacity-80">
               Privacy-Protected Printing System
             </p>
+            <button
+              onClick={() => navigate("/home")}
+              className="btn-primary mt-8"
+            >
+              Start
+            </button>
           </motion.div>
         </section>
 
@@ -148,16 +154,10 @@ function Landing() {
 
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <button
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate("/home")}
                 className="bg-[#D91828] text-white px-14 py-5 font-black uppercase tracking-widest hover:bg-[#3BBCD9] transition-all transform hover:scale-105 active:scale-95"
               >
                 START
-              </button>
-              <button
-                onClick={() => navigate("/admin/login")}
-                className="bg-[#3BBCD9] text-[#26333B] px-14 py-5 font-black uppercase tracking-widest hover:bg-[#D91828] transition-all transform hover:scale-105 active:scale-95"
-              >
-                Admin Login
               </button>
             </div>
           </div>

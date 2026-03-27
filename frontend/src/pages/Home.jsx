@@ -16,13 +16,10 @@ export default function Home() {
               type="button"
               className="sp-card"
               style={{ cursor: "pointer" }}
-              onClick={() => {
-                if (auth?.token && auth.role === "customer") navigate("/upload");
-                else navigate("/signup");
-              }}
+              onClick={() => navigate("/signup")}
             >
-              <div style={{ fontSize: 22, fontWeight: 800 }}>👤 Customer</div>
-              <div style={{ color: "var(--sp-muted)", marginTop: 6 }}>User Flow</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>👤 Login as Customer</div>
+              <div style={{ color: "var(--sp-muted)", marginTop: 6 }}>Customer Signup/Login page</div>
             </button>
 
             <button
@@ -31,7 +28,7 @@ export default function Home() {
               style={{ cursor: "pointer" }}
               onClick={() => navigate("/admin/login")}
             >
-              <div style={{ fontSize: 22, fontWeight: 800 }}>🧑‍💻 Admin</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>🧑‍💻 Login as Admin</div>
               <div style={{ color: "var(--sp-muted)", marginTop: 6 }}>Admin Login Page</div>
             </button>
           </div>
