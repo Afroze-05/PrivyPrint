@@ -236,3 +236,13 @@ body {
 .sp-table tr:last-child td {
   border-bottom: none;
 }
+
+
+/* Security Styles */
+.secure-content {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+

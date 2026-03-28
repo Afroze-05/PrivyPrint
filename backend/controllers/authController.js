@@ -23,6 +23,11 @@ async function signup(req, res) {
       return res.status(400).json({ message: "role must be 'admin' or 'customer'." });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format." });
+    }
+
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
       return res.status(409).json({ message: "Email already registered." });
@@ -87,4 +92,3 @@ async function login(req, res) {
 }
 
 module.exports = { signup, login };
-

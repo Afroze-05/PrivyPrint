@@ -414,6 +414,12 @@ export default function AdminLogin() {
     try {
       const res = await api.post('/auth/login', { email, password });
       const { token, user } = res.data;
+
+      if (user.role !== "admin") {
+        setError("Access denied. Admin account required.");
+        return;
+      }
+
       setAuth({ token, ...user });
       navigate('/admin/dashboard');
     } catch (err) {
@@ -558,4 +564,8 @@ export default function AdminLogin() {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> afroze

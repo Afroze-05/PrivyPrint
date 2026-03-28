@@ -74,5 +74,40 @@ async function getStats(req, res) {
   }
 }
 
-module.exports = { getStats };
+async function getPrintStats(req, res) {
+  try {
+    const [total, printsByTypeAgg] = await Promise.all([
+      Log.countDocuments(),
+      Log.aggregate([
+        {
+          $lookup: {
+            from: "documents",
+            localField: "token",
+            foreignField: "token",
+            as: "doc",
+          },
+        },
+        { $unwind: "$doc" },
+        { $match: { "doc.status": "completed" } },
+        { $group: { _id: "$doc.type", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const stats = { Color: 0, "B/W": 0 };
+    for (const row of printsByTypeAgg) {
+      if (row._id === "Color") stats.Color = row.count;
+      if (row._id === "B/W") stats["B/W"] = row.count;
+    }
+
+    return res.status(200).json({
+      bw: stats["B/W"],
+      color: stats.Color,
+      total,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to fetch print stats.", error: err.message });
+  }
+}
+
+module.exports = { getStats, getPrintStats };
 

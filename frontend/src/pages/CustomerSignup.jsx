@@ -383,32 +383,30 @@ const STRENGTH_COLORS = {
 
 export default function CustomerSignup() {
   const navigate = useNavigate();
-  const [name,     setName]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
-
-  // Inject styles once
-  import('react').then(({ useLayoutEffect }) => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  if (typeof window !== 'undefined') injectStyles();
-
-  const strength = getStrength(password);
-
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const isNameValid  = name.trim().length >= 2;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleCreateAccount(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/signup', { name, email, password, role: 'customer' });
-      const loginRes = await api.post('/auth/login', { email, password });
+      // Create user (customer).
+      await api.post("/auth/signup", {
+        name,
+        email,
+        password,
+        role: "customer",
+      });
+
+      // Auto-login so the user can upload immediately after "Create Account".
+      const loginRes = await api.post("/auth/login", { email, password });
       const { token, user } = loginRes.data;
       setAuth({ token, ...user });
-      navigate('/home');
+      navigate("/home");
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Signup failed.');
     } finally {
@@ -416,159 +414,82 @@ export default function CustomerSignup() {
     }
   }
 
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const loginRes = await api.post("/auth/login", { email, password });
+      const { token, user } = loginRes.data;
+
+      setAuth({ token, ...user });
+      navigate("/upload");
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Login failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="signup-root">
-      <div className="signup-grain" />
+    <div className="sp-page">
+      <div className="sp-container">
+        <div className="sp-card" style={{ maxWidth: 560, margin: "0 auto" }}>
+          <h2 style={{ marginTop: 0 }}>Customer Signup</h2>
+          <div className="sp-divider" />
 
-      <div className="su-fade-up" style={{ width: '100%', maxWidth: 460, position: 'relative', zIndex: 1 }}>
-
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="su-scale-in" style={{ display: 'inline-block', marginBottom: '1rem' }}>
-            <div className="su-logo-chip">
-              <span className="su-logo-dot" />
-              SecurePrint
-            </div>
-          </div>
-          <h1 className="su-heading su-fade-up su-delay-100">Create Account</h1>
-          <p className="su-sub su-fade-up su-delay-200">
-            Join SecurePrint &nbsp;·&nbsp; Free to get started
-          </p>
-        </div>
-
-        {/* Card */}
-        <div className="signup-glass-card su-fade-up su-delay-200">
-          <form onSubmit={handleCreateAccount} className="su-form">
-
-            {/* Name */}
-            <div className="su-field su-fade-up su-delay-200">
-              <label className="su-field-label">Full Name</label>
-              <div className="su-input-wrap">
-                <span className="su-input-icon">👤</span>
-                <input
-                  className={`su-input${isNameValid && name ? ' valid' : ''}`}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your full name"
-                  required
-                  autoComplete="name"
-                />
-                {isNameValid && name && (
-                  <span className="su-input-valid-icon">✓</span>
-                )}
-              </div>
+          <form onSubmit={handleCreateAccount}>
+            <div className="sp-field">
+              <div className="sp-label">Name</div>
+              <input
+                className="sp-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                required
+              />
             </div>
 
-            {/* Email */}
-            <div className="su-field su-fade-up su-delay-300">
-              <label className="su-field-label">Email Address</label>
-              <div className="su-input-wrap">
-                <span className="su-input-icon">✉️</span>
-                <input
-                  className={`su-input${isEmailValid && email ? ' valid' : ''}`}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="you@example.com"
-                  required
-                  autoComplete="email"
-                />
-                {isEmailValid && email && (
-                  <span className="su-input-valid-icon">✓</span>
-                )}
-              </div>
+            <div className="sp-field">
+              <div className="sp-label">Email</div>
+              <input
+                className="sp-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                placeholder="you@example.com"
+                required
+              />
             </div>
 
-            {/* Password */}
-            <div className="su-field su-fade-up su-delay-400">
-              <label className="su-field-label">Password</label>
-              <div className="su-input-wrap">
-                <span className="su-input-icon">🔑</span>
-                <input
-                  className={`su-input${strength.score >= 3 ? ' valid' : ''}`}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type="password"
-                  placeholder="Create a strong password"
-                  required
-                  autoComplete="new-password"
-                />
-                {strength.score >= 3 && (
-                  <span className="su-input-valid-icon">✓</span>
-                )}
-              </div>
-              {password && (
-                <>
-                  <div className="su-strength-bar">
-                    {[1,2,3,4].map((seg) => {
-                      const lit = strength.score >= seg;
-                      return (
-                        <div
-                          key={seg}
-                          className={`su-strength-seg${lit ? ` lit-${strength.color}` : ''}`}
-                          style={lit ? { background: STRENGTH_COLORS[strength.color] } : {}}
-                        />
-                      );
-                    })}
-                  </div>
-                  <div
-                    className="su-strength-label"
-                    style={strength.color ? { color: STRENGTH_COLORS[strength.color] } : {}}
-                  >
-                    {strength.label}
-                  </div>
-                </>
-              )}
+            <div className="sp-field">
+              <div className="sp-label">Password</div>
+              <input
+                className="sp-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                placeholder="Create a strong password"
+                required
+              />
             </div>
 
-            {/* Divider */}
-            <div className="su-divider" />
+            {error ? (
+              <div style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}>{error}</div>
+            ) : null}
 
-            {/* Error */}
-            {error && (
-              <div className="su-error">
-                <div className="su-error-icon">⚠</div>
-                {error}
-              </div>
-            )}
-
-            {/* Submit */}
             <button
+              className="sp-btn sp-btn-primary"
               type="submit"
-              className="su-submit su-fade-up su-delay-500"
               disabled={loading}
+              style={{ width: "100%" }}
             >
-              {loading ? (
-                <>
-                  <div className="su-spinner" />
-                  Creating your account…
-                </>
-              ) : (
-                <>
-                  <span className="su-submit-icon">🚀</span>
-                  Create Account
-                </>
-              )}
+              {loading ? "Creating..." : "Create Account"}
             </button>
           </form>
-
-          {/* Sign-in link */}
-          <div className="su-signin-row">
-            Already have an account?&nbsp;
-            <a href="/login">Sign in</a>
-          </div>
-        </div>
-
-        {/* Trust badges */}
-        <div className="su-trust-row su-fade-up su-delay-500">
-          {['256-bit AES', 'Zero Logs', 'GDPR Ready'].map((t) => (
-            <div key={t} className="su-trust-badge">
-              <span className="su-trust-dot" />
-              {t}
-            </div>
-          ))}
         </div>
       </div>
     </div>
   );
 }
+
