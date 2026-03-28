@@ -5,6 +5,7 @@ import { api, apiBaseUrl, authHeader } from "../../services/api";
 import { getAuth, setAuth } from "../../services/authStorage";
 import CameraPermissionModal from "../../components/CameraPermissionModal";
 import SecurityOverlay from "../../components/SecurityOverlay";
+import PhoneDetection from "../../components/security/PhoneDetection";
 
 function formatWatermarkTime(d) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -217,6 +218,7 @@ export default function AdminPrintPanel() {
   return (
     <div className="sp-page secure-content">
       <SecurityOverlay />
+      <PhoneDetection existingVideoRef={videoRef} />
       {showCameraModal && <CameraPermissionModal onPermissionGranted={handleCameraGranted} />}
 
       <div className="sp-container">
