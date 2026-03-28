@@ -4,6 +4,8 @@ import { api } from "../../services/api";
 import { getAuth, clearAuth } from "../../services/authStorage";
 import PieChart from "../../components/charts/PieChart";
 import BarChart from "../../components/charts/BarChart";
+import SecurityOverlay from "../../components/SecurityOverlay";
+import PrintStatsChart from "../../components/charts/PrintStatsChart";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -25,7 +27,19 @@ export default function AdminDashboard() {
       setStats(res.data);
       if (typeof res.data?.trustScore === "number") setTrustScore(res.data.trustScore);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Failed to fetch stats.");
+      console.warn("Analytics API failed, using local stats fallback.", err);
+      // Suppress "Failed to fetch" error for user as requested
+      // Fallback: If API fails, we still have the local chart working below.
+      // We can also try to populate some stats from localStorage if they exist.
+      const today = new Date().toISOString().split("T")[0];
+      const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
+      const dayStats = allStats[today] || { bw: 0, color: 0, total: 0 };
+      
+      setStats(prev => ({
+        ...prev,
+        totalPrints: dayStats.total,
+        printsByType: { "B/W": dayStats.bw, Color: dayStats.color }
+      }));
     } finally {
       setLoading(false);
     }
@@ -33,15 +47,32 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadStats();
-    // Keep trust score in sync if another page updates localStorage.
-    const updateTrustScore = () => {
+    // Keep trust score and local stats in sync
+    const syncLocalData = () => {
       const next = getAuth()?.trustScore;
       if (typeof next === "number") setTrustScore(next);
+      
+      // If we are currently showing local fallback or if we just want it to be snappy
+      const today = new Date().toISOString().split("T")[0];
+      const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
+      const dayStats = allStats[today];
+      if (dayStats) {
+        setStats(prev => ({
+          ...prev,
+          totalPrints: dayStats.total,
+          printsByType: { "B/W": dayStats.bw, Color: dayStats.color }
+        }));
+      }
     };
-    updateTrustScore();
-    window.addEventListener("storage", updateTrustScore);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => window.removeEventListener("storage", updateTrustScore);
+
+    syncLocalData();
+    window.addEventListener("storage", syncLocalData);
+    window.addEventListener("localStatsUpdated", syncLocalData);
+
+    return () => {
+      window.removeEventListener("storage", syncLocalData);
+      window.removeEventListener("localStatsUpdated", syncLocalData);
+    };
   }, []);
 
   function handleLogout() {
@@ -50,7 +81,8 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="sp-page">
+    <div className="sp-page secure-content">
+      <SecurityOverlay />
       <div className="sp-container">
         <div className="sp-card" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -134,6 +166,20 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="sp-card" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Real-Time Print Analytics</h3>
+              <div style={{ color: "var(--sp-muted)", fontWeight: 800 }}>Live updates for B/W, Color, and Total prints</div>
+            </div>
+            <div className="sp-badge" style={{ color: "var(--sp-blue)", borderColor: "var(--sp-blue)", background: "rgba(31,111,235,0.05)" }}>
+              <div className="animate-pulse" style={{ width: 8, height: 8, background: "var(--sp-blue)", borderRadius: "50%" }}></div>
+              Live
+            </div>
+          </div>
+          <PrintStatsChart />
         </div>
 
         <div className="sp-card">

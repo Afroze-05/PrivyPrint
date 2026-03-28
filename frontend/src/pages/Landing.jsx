@@ -55,6 +55,7 @@ function Landing() {
     <div
       ref={targetRef}
       className="relative h-[400vh] bg-[#26333B] overflow-visible font-sans"
+      style={{ position: 'relative' }}
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         {/* === BASE LAYER: RED THEME WITH CUSTOM FONT === */}

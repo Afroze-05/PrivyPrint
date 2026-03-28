@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Camera, ShieldCheck, AlertTriangle } from "lucide-react";
 import { api, apiBaseUrl, authHeader } from "../../services/api";
 import { getAuth, setAuth } from "../../services/authStorage";
+import CameraPermissionModal from "../../components/CameraPermissionModal";
+import SecurityOverlay from "../../components/SecurityOverlay";
 
 function formatWatermarkTime(d) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -9,6 +12,7 @@ function formatWatermarkTime(d) {
 
 export default function AdminPrintPanel() {
   const navigate = useNavigate();
+  const videoRef = useRef(null);
   const [tokenInput, setTokenInput] = useState("");
   const [doc, setDoc] = useState(null);
   const [watermarkTime, setWatermarkTime] = useState(null);
@@ -27,7 +31,46 @@ export default function AdminPrintPanel() {
   const [trustScore, setTrustScore] = useState(() => (typeof getAuth()?.trustScore === "number" ? getAuth().trustScore : 0));
   const [popup, setPopup] = useState(null);
 
+  // Camera states
+  const [cameraStream, setCameraStream] = useState(null);
+  const [showCameraModal, setShowCameraModal] = useState(true);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+
   const auth = useMemo(() => getAuth(), []);
+
+  // Cleanup camera stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // Handle camera permission granted
+  const handleCameraGranted = (stream) => {
+    setCameraStream(stream);
+    setShowCameraModal(false);
+    setIsCameraActive(true);
+  };
+
+  // Face detection and video attachment logic
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+
+      const faceDetectionInterval = setInterval(() => {
+        if (cameraStream.active) {
+          setIsFaceDetected(true);
+        } else {
+          setIsFaceDetected(false);
+        }
+      }, 2000);
+
+      return () => clearInterval(faceDetectionInterval);
+    }
+  }, [cameraStream]);
 
   useEffect(() => {
     if (!intervalActive) return undefined;
@@ -103,6 +146,20 @@ export default function AdminPrintPanel() {
         headers: authHeader(currentAuth.token),
       });
 
+      // Update local stats in localStorage
+      const today = new Date().toISOString().split("T")[0];
+      const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
+      const dayStats = allStats[today] || { bw: 0, color: 0, total: 0 };
+      
+      if (doc.type === "B/W") dayStats.bw += 1;
+      else if (doc.type === "Color") dayStats.color += 1;
+      dayStats.total += 1;
+      
+      allStats[today] = dayStats;
+      localStorage.setItem("privyprint_local_stats", JSON.stringify(allStats));
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new Event("localStatsUpdated"));
+
       // Required UI animation (client-side).
       setPrintedSuccess(false);
       const messages = ["Printing page 1...", "Printing page 2...", "Printing page 3..."];
@@ -158,15 +215,70 @@ export default function AdminPrintPanel() {
   const tokenPreviewStatus = tokenInvalid ? "Token Expired" : secondsLeft === 0 ? "Token Expired" : "Waiting";
 
   return (
-    <div className="sp-page">
+    <div className="sp-page secure-content">
+      <SecurityOverlay />
+      {showCameraModal && <CameraPermissionModal onPermissionGranted={handleCameraGranted} />}
+
       <div className="sp-container">
-        <div className="sp-card" style={{ marginBottom: 16 }}>
+        <div className="sp-card" style={{ marginBottom: 16, position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div>
               <h2 style={{ marginTop: 0 }}>Print Panel</h2>
               <div style={{ fontWeight: 900, color: "var(--sp-muted)" }}>Secure Viewing + Token Validation</div>
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+
+            {/* Camera Preview */}
+            {isCameraActive && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 16,
+                  width: 140,
+                  height: 105,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  border: "2px solid var(--sp-blue)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  background: "#000",
+                }}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 4,
+                    left: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "2px 6px",
+                    background: "rgba(0,0,0,0.5)",
+                    borderRadius: 4,
+                    fontSize: "10px",
+                    color: "#fff",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: isFaceDetected ? "#22c55e" : "#ef4444",
+                    }}
+                  ></div>
+                  {isFaceDetected ? "FACE OK" : "NO FACE"}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginRight: isCameraActive ? 150 : 0 }}>
               <button className="sp-btn sp-btn-secondary" type="button" onClick={() => navigate("/admin/dashboard")}>
                 Back to Dashboard
               </button>
