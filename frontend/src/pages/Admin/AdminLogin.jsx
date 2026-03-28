@@ -27,7 +27,20 @@ export default function AdminLogin() {
       setAuth({ token, ...user });
       navigate("/admin/dashboard");
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Login failed.");
+      const isNotVerified = err?.response?.data?.notVerified;
+
+      if (isNotVerified) {
+        setError("Account not verified. Redirecting...");
+
+        // This is the important part: passing 'state' so VerifyOtp can see the email
+        setTimeout(() => {
+          navigate("/verify-otp", { state: { email: email } });
+        }, 1500);
+      } else {
+        setError(
+          err?.response?.data?.message || err.message || "Login failed.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -65,14 +78,27 @@ export default function AdminLogin() {
               />
             </div>
 
-            {error ? <div style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}>{error}</div> : null}
+            {error ? (
+              <div
+                style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}
+              >
+                {error}
+              </div>
+            ) : null}
 
-            <button className="sp-btn sp-btn-primary" type="submit" disabled={loading} style={{ width: "100%" }}>
+            <button
+              className="sp-btn sp-btn-primary"
+              type="submit"
+              disabled={loading}
+              style={{ width: "100%" }}
+            >
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
 
-          <div style={{ marginTop: 14, color: "var(--sp-muted)", fontWeight: 700 }}>
+          <div
+            style={{ marginTop: 14, color: "var(--sp-muted)", fontWeight: 700 }}
+          >
             No admin account?{" "}
             <button
               type="button"
