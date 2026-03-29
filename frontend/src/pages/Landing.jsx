@@ -411,8 +411,6 @@ function Landing() {
       ref={targetRef}
       className="lp-root"
       style={{ position: 'relative', height: '400vh', background: '#26333B', overflow: 'visible', fontFamily: 'sans-serif' }}
-      className="relative h-[400vh] bg-[#26333B] overflow-visible font-sans"
-      style={{ position: 'relative' }}
     >
       {/* Grain overlay */}
       <div className="lp-grain" />
@@ -489,17 +487,6 @@ function Landing() {
             >
               <span>Scroll to explore</span>
             </motion.div>
-              Privy<span className="text-[#3BBCD9]">Print</span>
-            </h1>
-            <p className="text-lg md:text-xl font-bold text-[#3BBCD9] tracking-[0.5em] uppercase opacity-80">
-              Privacy-Protected Printing System
-            </p>
-            <button
-              onClick={() => navigate("/home")}
-              className="btn-primary mt-8"
-            >
-              Start
-            </button>
           </motion.div>
 
           {/* Scroll indicator */}
@@ -704,7 +691,6 @@ function Landing() {
               <span>Privy</span> Print
             </h2>
 
-<<<<<<< HEAD
             {/* Subtext */}
             <p style={{
               fontFamily: "'DM Mono', monospace",
@@ -726,15 +712,6 @@ function Landing() {
               <button className="lp-btn-secondary" onClick={() => navigate('/admin/login')}>
                 Admin Login
               </button>
-=======
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <button
-                onClick={() => navigate("/home")}
-                className="bg-[#D91828] text-white px-14 py-5 font-black uppercase tracking-widest hover:bg-[#3BBCD9] transition-all transform hover:scale-105 active:scale-95"
-              >
-                START
-              </button>
->>>>>>> afroze
             </div>
 
             {/* Mono note */}

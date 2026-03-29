@@ -564,8 +564,5 @@ export default function AdminLogin() {
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> afroze
+

@@ -432,55 +432,28 @@ export default function Home() {
 
           <div className="hm-divider" style={{ marginTop: '1.5rem' }} />
 
-          {/* Footer note */}
-          <div style={{
-            marginTop: '1rem',
-            fontFamily: "'DM Mono', monospace",
-            fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.15)',
-            textAlign: 'center',
-          }}>
-            All sessions are end-to-end encrypted
-  return (
-    <div className="sp-page">
-      <div className="sp-container">
-        <div className="sp-card">
-          <h2 style={{ marginTop: 0 }}>Home</h2>
-          <div className="sp-divider" />
-          <div className="sp-grid-2">
-            <button
-              type="button"
-              className="sp-card"
-              style={{ cursor: "pointer" }}
-              onClick={() => navigate("/signup")}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800 }}>👤 Login as Customer</div>
-              <div style={{ color: "var(--sp-muted)", marginTop: 6 }}>Customer Signup/Login page</div>
-            </button>
-
-            <button
-              type="button"
-              className="sp-card"
-              style={{ cursor: "pointer" }}
-              onClick={() => navigate("/admin/login")}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800 }}>🧑‍💻 Login as Admin</div>
-              <div style={{ color: "var(--sp-muted)", marginTop: 6 }}>Admin Login Page</div>
-            </button>
+            {/* Footer note */}
+            <div style={{
+              marginTop: '1rem',
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.15)',
+              textAlign: 'center',
+            }}>
+              All sessions are end-to-end encrypted
+            </div>
+          </div>
+  
+          {/* Trust badges */}
+          <div className="hm-trust-row hm-anim-up hm-d4">
+            {['256-bit AES', 'Zero Logs', 'GDPR Ready'].map((t) => (
+              <div key={t} className="hm-trust-badge">
+                <span className="hm-trust-dot-green" />
+                {t}
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Trust badges */}
-        <div className="hm-trust-row hm-anim-up hm-d4">
-          {['256-bit AES', 'Zero Logs', 'GDPR Ready'].map((t) => (
-            <div key={t} className="hm-trust-badge">
-              <span className="hm-trust-dot-green" />
-              {t}
-            </div>
-          ))}
-        </div>
-
       </div>
-    </div>
-  );
-}
+    );
+  }
