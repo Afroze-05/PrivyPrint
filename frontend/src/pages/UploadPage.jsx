@@ -1,572 +1,403 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, authHeader } from "../services/api";
+import { getAuth } from "../services/authStorage";
+import { setCustomerToken } from "../services/customerTokenStorage";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Upload, FileText, Printer, Hash, Cpu,
+  ArrowLeft, ChevronRight, X, ImageIcon,
+} from "lucide-react";
 
-/* ─────────────────────────────────────────────
-   Inline styles injected once at module level
-   (Google Fonts + keyframes + custom utilities)
-───────────────────────────────────────────── */
-const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-  *, *::before, *::after { box-sizing: border-box; }
+/* ── Dot-grid background ── */
+const GridDots = () => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, #3BBCD9 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity: 0.08,
+    }}
+  />
+);
 
-  .upload-root {
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    background: #080C18;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    position: relative;
-    overflow: hidden;
-  }
+/* ── Ambient glow orb ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{ scale: [1, 1.18, 1], opacity: [0.12, 0.22, 0.12] }}
+    transition={{ duration: 6, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
 
-  /* Ambient blobs */
-  .upload-root::before {
-    content: '';
-    position: fixed;
-    width: 600px; height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
-    top: -100px; left: -150px;
-    pointer-events: none;
-  }
-  .upload-root::after {
-    content: '';
-    position: fixed;
-    width: 500px; height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%);
-    bottom: -80px; right: -120px;
-    pointer-events: none;
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  /* Grain overlay */
-  .grain {
-    position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-    background-size: 180px 180px;
-    opacity: 0.5;
-  }
-
-  /* Card */
-  .glass-card {
-    position: relative; z-index: 1;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 24px;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.04) inset,
-      0 32px 80px rgba(0,0,0,0.55),
-      0 8px 24px rgba(0,0,0,0.3);
-    padding: 2.5rem;
-    width: 100%;
-    max-width: 480px;
-  }
-
-  /* Animations */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(28px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.96); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-  @keyframes shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position: 200% center; }
-  }
-  @keyframes pulse-ring {
-    0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59,130,246,0.45); }
-    70%  { transform: scale(1);    box-shadow: 0 0 0 12px rgba(59,130,246,0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59,130,246,0); }
-  }
-  @keyframes borderGlow {
-    0%, 100% { border-color: rgba(59,130,246,0.5); }
-    50%       { border-color: rgba(99,102,241,0.8); }
-  }
-  @keyframes tickBounce {
-    0%   { transform: scale(0); opacity: 0; }
-    60%  { transform: scale(1.2); }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  @keyframes dotFloat {
-    0%, 100% { transform: translateY(0px); }
-    50%       { transform: translateY(-6px); }
-  }
-
-  .animate-fade-up  { animation: fadeUp  0.55s cubic-bezier(0.22,1,0.36,1) both; }
-  .animate-scale-in { animation: scaleIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
-  .delay-100 { animation-delay: 0.10s; }
-  .delay-200 { animation-delay: 0.20s; }
-  .delay-300 { animation-delay: 0.30s; }
-  .delay-400 { animation-delay: 0.40s; }
-
-  /* Typography */
-  .heading {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 2rem;
-    letter-spacing: -0.03em;
-    line-height: 1.15;
-    color: #F1F5FF;
-    margin: 0;
-  }
-  .sub {
-    font-size: 0.8125rem;
-    color: rgba(255,255,255,0.38);
-    letter-spacing: 0.01em;
-    margin-top: 0.35rem;
-    font-weight: 300;
-  }
-
-  /* Logo chip */
-  .logo-chip {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    background: rgba(59,130,246,0.12);
-    border: 1px solid rgba(59,130,246,0.25);
-    border-radius: 100px;
-    padding: 0.3rem 0.85rem 0.3rem 0.45rem;
-    font-size: 0.72rem;
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #93C5FD;
-    margin-bottom: 1.25rem;
-  }
-  .logo-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #3B82F6;
-    animation: pulse-ring 2s ease-out infinite;
-  }
-
-  /* Drop zone */
-  .dropzone {
-    border-radius: 16px;
-    border: 1.5px dashed rgba(255,255,255,0.12);
-    padding: 2.25rem 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    background: rgba(255,255,255,0.02);
-    position: relative;
-    overflow: hidden;
-  }
-  .dropzone:hover,
-  .dropzone.drag-over {
-    border-color: rgba(59,130,246,0.55);
-    background: rgba(59,130,246,0.06);
-    animation: borderGlow 2s ease-in-out infinite;
-  }
-  .dropzone.has-file {
-    border-style: solid;
-    border-color: rgba(52,211,153,0.5);
-    background: rgba(52,211,153,0.05);
-    animation: none;
-  }
-  .dropzone-icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
-    display: block;
-    transition: transform 0.3s ease;
-  }
-  .dropzone:hover .dropzone-icon { transform: translateY(-3px) scale(1.05); }
-  .dropzone.drag-over .dropzone-icon { transform: translateY(-6px) scale(1.1); }
-  .dropzone-title {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: #E2E8F0;
-    margin-bottom: 0.3rem;
-  }
-  .dropzone-hint {
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.3);
-    letter-spacing: 0.04em;
-    font-weight: 300;
-  }
-
-  /* File pill */
-  .file-pill {
-    display: flex; align-items: center; gap: 0.65rem;
-    background: rgba(52,211,153,0.1);
-    border: 1px solid rgba(52,211,153,0.25);
-    border-radius: 12px;
-    padding: 0.65rem 0.9rem;
-    margin-top: 0.5rem;
-    width: 100%;
-  }
-  .file-pill-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: rgba(52,211,153,0.18);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; flex-shrink: 0;
-  }
-  .file-pill-name {
-    font-size: 0.8rem; font-weight: 500; color: #6EE7B7;
-    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .file-pill-tick {
-    font-size: 1rem;
-    animation: tickBounce 0.4s ease both;
-  }
-
-  /* Section label */
-  .field-label {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 0.68rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.4);
-    margin-bottom: 0.75rem;
-    display: block;
-  }
-
-  /* Mode cards */
-  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .mode-card {
-    border-radius: 14px;
-    border: 1.5px solid rgba(255,255,255,0.07);
-    background: rgba(255,255,255,0.03);
-    padding: 1rem 0.75rem;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.22s ease;
-    display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-  }
-  .mode-card:hover {
-    border-color: rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.06);
-    transform: translateY(-2px);
-  }
-  .mode-card.active {
-    border-color: #3B82F6;
-    background: rgba(59,130,246,0.12);
-    box-shadow: 0 0 0 1px rgba(59,130,246,0.3) inset, 0 8px 20px rgba(59,130,246,0.2);
-    transform: translateY(-2px);
-  }
-  .mode-card-icon {
-    width: 40px; height: 40px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem;
-    background: rgba(255,255,255,0.06);
-    transition: background 0.22s;
-  }
-  .mode-card.active .mode-card-icon {
-    background: rgba(59,130,246,0.25);
-  }
-  .mode-card-label {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700; font-size: 0.78rem;
-    color: rgba(255,255,255,0.55);
-    transition: color 0.22s;
-  }
-  .mode-card.active .mode-card-label { color: #93C5FD; }
-  .mode-card-desc {
-    font-size: 0.68rem; color: rgba(255,255,255,0.25);
-    font-weight: 300;
-    transition: color 0.22s;
-  }
-  .mode-card.active .mode-card-desc { color: rgba(147,197,253,0.6); }
-
-  /* Copies stepper */
-  .stepper {
-    display: flex; align-items: center; gap: 0;
-    background: rgba(255,255,255,0.04);
-    border: 1.5px solid rgba(255,255,255,0.08);
-    border-radius: 14px;
-    overflow: hidden;
-    height: 48px;
-  }
-  .stepper-btn {
-    width: 48px; height: 48px;
-    background: none; border: none; cursor: pointer;
-    font-size: 1.25rem; font-weight: 300;
-    color: rgba(255,255,255,0.5);
-    transition: all 0.18s ease;
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .stepper-btn:hover {
-    background: rgba(59,130,246,0.15);
-    color: #93C5FD;
-  }
-  .stepper-btn:active { transform: scale(0.9); }
-  .stepper-val {
-    flex: 1; text-align: center;
-    font-family: 'Syne', sans-serif;
-    font-weight: 800; font-size: 1.1rem;
-    color: #F1F5FF;
-    border: none; background: none; outline: none;
-  }
-  .stepper-divider {
-    width: 1px; height: 28px;
-    background: rgba(255,255,255,0.08);
-    flex-shrink: 0;
-  }
-
-  /* Divider */
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
-    margin: 0.25rem 0;
-  }
-
-  /* Trust badges */
-  .trust-row {
-    display: flex; gap: 0.5rem; justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 1.5rem;
-  }
-  .trust-badge {
-    display: flex; align-items: center; gap: 0.35rem;
-    font-size: 0.68rem; font-weight: 400; letter-spacing: 0.02em;
-    color: rgba(255,255,255,0.25);
-    padding: 0.3rem 0.6rem;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 100px;
-  }
-  .trust-badge-dot {
-    width: 5px; height: 5px; border-radius: 50%;
-    background: rgba(52,211,153,0.7);
-  }
-
-  /* Submit button */
-  .submit-btn {
-    width: 100%; padding: 0.9rem 1.5rem;
-    border-radius: 14px; border: none; cursor: pointer;
-    font-family: 'Syne', sans-serif;
-    font-weight: 800; font-size: 0.92rem;
-    letter-spacing: 0.04em;
-    color: #fff;
-    position: relative; overflow: hidden;
-    background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
-    box-shadow: 0 4px 20px rgba(37,99,235,0.4), 0 1px 0 rgba(255,255,255,0.12) inset;
-    transition: all 0.22s ease;
-    display: flex; align-items: center; justify-content: center; gap: 0.65rem;
-  }
-  .submit-btn::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
-    background-size: 200% auto;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  .submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(37,99,235,0.55), 0 1px 0 rgba(255,255,255,0.15) inset;
-  }
-  .submit-btn:hover::before {
-    opacity: 1;
-    animation: shimmer 1.5s linear infinite;
-  }
-  .submit-btn:active { transform: translateY(0); }
-
-  .submit-btn .lock-icon {
-    width: 22px; height: 22px; border-radius: 6px;
-    background: rgba(255,255,255,0.15);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem;
-  }
-
-  /* Section spacing */
-  .form-section { display: flex; flex-direction: column; gap: 1.5rem; }
-`;
-
-function injectStyles() {
-  if (document.getElementById('upload-page-styles')) return;
-  const tag = document.createElement('style');
-  tag.id = 'upload-page-styles';
-  tag.textContent = GLOBAL_CSS;
-  document.head.appendChild(tag);
-}
+/* ── Section label ── */
+const SectionLabel = ({ children }) => (
+  <div className="flex items-center gap-3 mb-3">
+    <div className="h-px w-6 bg-[#3BBCD9]/50" />
+    <span className="text-[9px] font-black tracking-[0.5em] text-white/30 uppercase">{children}</span>
+  </div>
+);
 
 export default function UploadPage() {
   const navigate = useNavigate();
+  const auth = useMemo(() => getAuth(), []);
+  const fileInputRef = useRef(null);
+
   const [file, setFile] = useState(null);
-  const [printType, setPrintType] = useState('B/W');
+  const [type, setType] = useState("B/W");
   const [copies, setCopies] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
-  // Inject styles once
-  React.useLayoutEffect(() => { injectStyles(); }, []);
-
-  const handleUpload = (e) => {
-    e.preventDefault();
-    const randomToken = `SPX-${Math.floor(1000 + Math.random() * 9000)}`;
-    localStorage.setItem('activeToken', randomToken);
-    localStorage.setItem('printType', printType);
-    navigate('/token');
-  };
-
-  const handleDrop = (e) => {
+  function handleFileDrop(e) {
     e.preventDefault();
     setDragOver(false);
-    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
-  };
+    const dropped = e.dataTransfer?.files?.[0];
+    if (dropped) setFile(dropped);
+  }
 
-  const getFileIcon = (f) => {
-    if (!f) return '📁';
-    const ext = f.name.split('.').pop().toLowerCase();
-    if (ext === 'pdf') return '📕';
-    if (['docx', 'doc'].includes(ext)) return '📘';
-    if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return '🖼️';
-    return '📄';
-  };
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (!auth?.token) throw new Error("Missing authentication token.");
+      if (!file) throw new Error("Please select a PDF or image file.");
 
-  const formatSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  };
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+      formData.append("copies", String(copies));
+
+      const res = await api.post("/upload", formData, {
+        headers: {
+          ...authHeader(auth.token),
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const { token, expiresAt, status } = res.data;
+      setCustomerToken({ token, expiresAt, status: status || "waiting" });
+      navigate("/token");
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Upload failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const isPDF = file?.type === "application/pdf";
+  const fileSizeKB = file ? (file.size / 1024).toFixed(1) : null;
 
   return (
-    <div className="upload-root">
-      <div className="grain" />
+    <div className="relative min-h-screen bg-[#0C1519] flex flex-col items-center justify-center px-6 py-12 overflow-hidden font-sans">
+      <NoiseSVG />
+      <GridDots />
+      <ScanLine />
+      <GlowOrb color="#3BBCD9" size={460} top="-8%" left="-6%" delay={0} />
+      <GlowOrb color="#D91828" size={340} top="50%" left="62%" delay={2} />
+      <GlowOrb color="#D9910D" size={220} top="70%" left="10%" delay={4} />
 
-      <div className="animate-fade-up" style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
+      {/* Edge rules */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D91828]/20 to-transparent" />
+      <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[#3BBCD9]/20 to-transparent" />
+      <div className="absolute top-0 right-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D91828]/15 to-transparent" />
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="animate-scale-in" style={{ display: 'inline-block', marginBottom: '1rem' }}>
-            <div className="logo-chip">
-              <span className="logo-dot" />
-              SecurePrint
-            </div>
-          </div>
-          <h1 className="heading animate-fade-up delay-100">Upload Your Document</h1>
-          <p className="sub animate-fade-up delay-200">
-            End-to-end encrypted &nbsp;·&nbsp; Auto-deleted after printing
-          </p>
-        </div>
+      {/* System tag */}
+      <div className="absolute top-7 left-8 flex items-center gap-2">
+        <Cpu className="w-3.5 h-3.5 text-[#3BBCD9]/40" />
+        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+          PrivyPrint OS v4.2
+        </span>
+      </div>
 
-        {/* Card */}
-        <div className="glass-card animate-fade-up delay-200">
-          <form onSubmit={handleUpload} className="form-section">
+      {/* Back */}
+      <motion.button
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4 }}
+        onClick={() => navigate("/home")}
+        className="absolute top-7 right-8 flex items-center gap-2 text-white/20 hover:text-[#3BBCD9] transition-colors duration-300 group"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform duration-300" />
+        <span className="text-[9px] font-black tracking-[0.45em] uppercase">Back</span>
+      </motion.button>
 
-            {/* ── Drop zone ── */}
-            <div>
-              <span className="field-label">Document</span>
-              <div
-                className={`dropzone${dragOver ? ' drag-over' : ''}${file ? ' has-file' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-              >
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xl"
+      >
+        {/* Eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-2.5 mb-8 px-5 py-2 border border-[#3BBCD9]/20 bg-[#3BBCD9]/4 w-fit"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D91828] animate-pulse shadow-[0_0_8px_#D91828]" />
+          <span className="text-[9px] font-black tracking-[0.55em] text-[#3BBCD9]/80 uppercase">
+            Secure Upload
+          </span>
+        </motion.div>
+
+        {/* Title */}
+        <h1
+          style={{ fontFamily: '"BlockForce", ui-sans-serif, system-ui, monospace', lineHeight: 0.88 }}
+          className="text-5xl md:text-6xl font-black tracking-tighter text-white uppercase select-none mb-5"
+        >
+          Upload{" "}
+          <span className="text-[#3BBCD9]" style={{ textShadow: "0 0 45px rgba(59,188,217,0.4)" }}>
+            Document
+          </span>
+        </h1>
+        <div className="w-full h-[2px] bg-gradient-to-r from-[#3BBCD9] via-[#D9910D] to-transparent mb-8" />
+
+        {/* Form panel */}
+        <form onSubmit={handleSubmit}>
+          <div
+            className="relative bg-[#0E1A21] border border-white/6 p-7 overflow-hidden"
+            style={{ clipPath: "polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%)" }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#3BBCD9] via-[#D9910D] to-transparent" />
+            <div className="absolute top-0 right-0 w-[24px] h-[24px] border-t border-r border-[#3BBCD9]/30" />
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at top left, rgba(59,188,217,0.04) 0%, transparent 60%)" }} />
+
+            <div className="relative z-10 flex flex-col gap-7">
+
+              {/* ── File drop zone ── */}
+              <div>
+                <SectionLabel>File Upload (PDF / Image)</SectionLabel>
                 <input
+                  ref={fileInputRef}
                   type="file"
-                  id="file-upload"
-                  style={{ display: 'none' }}
-                  onChange={(e) => setFile(e.target.files[0])}
+                  accept="application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
-                <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'block' }}>
-                  <span className="dropzone-icon">{file ? '✅' : dragOver ? '📂' : '📁'}</span>
-                  {!file ? (
+                <motion.div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleFileDrop}
+                  animate={{ borderColor: dragOver ? "rgba(59,188,217,0.5)" : "rgba(255,255,255,0.07)" }}
+                  className="relative cursor-pointer border border-dashed border-white/8 hover:border-[#3BBCD9]/40 transition-all duration-300 p-8 flex flex-col items-center gap-3 bg-[#0C1519]/60"
+                  style={{ clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)" }}
+                >
+                  {dragOver && (
+                    <motion.div
+                      className="absolute inset-0 pointer-events-none"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      style={{ background: "rgba(59,188,217,0.04)" }}
+                    />
+                  )}
+
+                  <AnimatePresence mode="wait">
+                    {file ? (
+                      <motion.div
+                        key="file"
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="flex items-center gap-4 w-full"
+                      >
+                        <div className="p-3 bg-[#3BBCD9]/10 border border-[#3BBCD9]/20 flex-shrink-0">
+                          {isPDF
+                            ? <FileText className="w-6 h-6 text-[#3BBCD9]" />
+                            : <ImageIcon className="w-6 h-6 text-[#3BBCD9]" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white truncate">{file.name}</p>
+                          <p className="text-[10px] text-white/30 font-bold tracking-widest mt-0.5 uppercase">
+                            {isPDF ? "PDF Document" : "Image"} · {fileSizeKB} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                          className="p-1.5 border border-white/10 hover:border-[#D91828]/40 text-white/20 hover:text-[#D91828] transition-all duration-200"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="empty"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="flex flex-col items-center gap-3 text-center"
+                      >
+                        <div className="p-4 bg-[#3BBCD9]/6 border border-[#3BBCD9]/15">
+                          <Upload className="w-7 h-7 text-[#3BBCD9]/60" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-white/40 uppercase tracking-widest">
+                            Drop file here
+                          </p>
+                          <p className="text-[10px] text-white/20 font-bold tracking-widest mt-1 uppercase">
+                            or click to browse · PDF / Image
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
+
+              {/* ── Print type ── */}
+              <div>
+                <SectionLabel>Select Type</SectionLabel>
+                <div className="grid grid-cols-2 gap-3">
+                  {["B/W", "Color"].map((opt) => (
+                    <motion.button
+                      key={opt}
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setType(opt)}
+                      className="relative flex items-center gap-3 p-4 border transition-all duration-300 overflow-hidden"
+                      style={{
+                        borderColor: type === opt ? "rgba(59,188,217,0.5)" : "rgba(255,255,255,0.07)",
+                        background: type === opt ? "rgba(59,188,217,0.06)" : "transparent",
+                        clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                      }}
+                    >
+                      {type === opt && (
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[#3BBCD9] to-transparent" />
+                      )}
+                      <Printer
+                        className="w-4 h-4 transition-colors duration-300"
+                        style={{ color: type === opt ? "#3BBCD9" : "rgba(255,255,255,0.2)" }}
+                      />
+                      <span
+                        className="text-xs font-black uppercase tracking-[0.3em] transition-colors duration-300"
+                        style={{ color: type === opt ? "white" : "rgba(255,255,255,0.3)" }}
+                      >
+                        {opt}
+                      </span>
+                      {/* Selected dot */}
+                      <div
+                        className="ml-auto w-2 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          background: type === opt ? "#3BBCD9" : "transparent",
+                          boxShadow: type === opt ? "0 0 6px #3BBCD9" : "none",
+                          border: type === opt ? "none" : "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      />
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Copies ── */}
+              <div>
+                <SectionLabel>Number of Copies</SectionLabel>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Hash className="w-4 h-4 text-white/20 group-focus-within:text-[#3BBCD9] transition-colors duration-300" />
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={copies}
+                    onChange={(e) => setCopies(Math.max(1, Number(e.target.value)))}
+                    required
+                    className="w-full bg-[#0C1519] border border-white/8 text-white text-sm font-black
+                      placeholder:text-white/20 focus:outline-none focus:border-[#3BBCD9]/50
+                      transition-all duration-300 py-4 pr-4 pl-11 tracking-widest"
+                    style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#3BBCD9]/0 group-focus-within:bg-[#3BBCD9]/50 transition-all duration-300" />
+                </div>
+              </div>
+
+              {/* ── Error ── */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8"
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
+                  <span className="text-[#D91828] text-xs font-bold">{error}</span>
+                </motion.div>
+              )}
+
+              {/* ── Submit ── */}
+              <motion.button
+                type="submit"
+                disabled={loading}
+                whileHover={{ scale: loading ? 1 : 1.02 }}
+                whileTap={{ scale: loading ? 1 : 0.97 }}
+                className="relative overflow-hidden group w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
+                  clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+                }}
+              >
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {loading ? (
                     <>
-                      <p className="dropzone-title">
-                        {dragOver ? 'Release to upload' : 'Drop file here or click to browse'}
-                      </p>
-                      <p className="dropzone-hint">PDF · DOCX · PNG &nbsp;—&nbsp; Max 10 MB</p>
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                      />
+                      Submitting...
                     </>
                   ) : (
-                    <div className="file-pill" onClick={(e) => e.preventDefault()}>
-                      <div className="file-pill-icon">{getFileIcon(file)}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="file-pill-name">{file.name}</div>
-                        <div style={{ fontSize: '0.68rem', color: 'rgba(110,231,183,0.55)', fontWeight: 300 }}>
-                          {formatSize(file.size)}
-                        </div>
-                      </div>
-                      <span className="file-pill-tick">✓</span>
-                    </div>
+                    <>
+                      Submit <ChevronRight className="w-4 h-4" />
+                    </>
                   )}
-                </label>
-              </div>
+                </span>
+              </motion.button>
+
             </div>
+          </div>
+        </form>
+      </motion.div>
 
-            <div className="divider" />
-
-            {/* ── Print Mode ── */}
-            <div>
-              <span className="field-label">Print Mode</span>
-              <div className="mode-grid">
-                {[
-                  { type: 'B/W',   icon: '◐', label: 'Black & White', desc: 'Economical' },
-                  { type: 'Color', icon: '🎨', label: 'Full Color',    desc: 'Vibrant' },
-                ].map(({ type, icon, label, desc }) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setPrintType(type)}
-                    className={`mode-card${printType === type ? ' active' : ''}`}
-                  >
-                    <div className="mode-card-icon">{icon}</div>
-                    <span className="mode-card-label">{label}</span>
-                    <span className="mode-card-desc">{desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="divider" />
-
-            {/* ── Copies ── */}
-            <div>
-              <span className="field-label">Number of Copies</span>
-              <div className="stepper">
-                <button
-                  type="button"
-                  className="stepper-btn"
-                  onClick={() => setCopies(c => Math.max(1, c - 1))}
-                >
-                  −
-                </button>
-                <div className="stepper-divider" />
-                <input
-                  className="stepper-val"
-                  type="number"
-                  min="1"
-                  value={copies}
-                  onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                />
-                <div className="stepper-divider" />
-                <button
-                  type="button"
-                  className="stepper-btn"
-                  onClick={() => setCopies(c => c + 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* ── Submit ── */}
-            <button type="submit" className="submit-btn">
-              <span className="lock-icon">🔒</span>
-              Generate Secure Token
-            </button>
-          </form>
-        </div>
-
-        {/* Trust badges */}
-        <div className="trust-row animate-fade-up delay-400">
-          {['256-bit AES', 'Zero Logs', 'GDPR Ready'].map((t) => (
-            <div key={t} className="trust-badge">
-              <span className="trust-badge-dot" />
-              {t}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Floating status indicator */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1 }}
+        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#3BBCD9]/20 bg-[#0C1519]/90 backdrop-blur-md"
+        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+      >
+        <span className="text-[10px] font-black text-[#3BBCD9] uppercase tracking-[0.35em]">
+          System Live
+        </span>
+        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+      </motion.div>
     </div>
   );
 }

@@ -105,20 +105,7 @@ export default function AdminLogin() {
       setAuth({ token, ...user });
       navigate("/admin/dashboard");
     } catch (err) {
-      const isNotVerified = err?.response?.data?.notVerified;
-
-      if (isNotVerified) {
-        setError("Account not verified. Redirecting...");
-
-        // This is the important part: passing 'state' so VerifyOtp can see the email
-        setTimeout(() => {
-          navigate("/verify-otp", { state: { email: email } });
-        }, 1500);
-      } else {
-        setError(
-          err?.response?.data?.message || err.message || "Login failed.",
-        );
-      }
+      setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -235,40 +222,72 @@ export default function AdminLogin() {
               required
             />
 
-            <div className="sp-field">
-              <div className="sp-label">Password</div>
-              <input
-                className="sp-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="Your password"
-                required
-              />
-            </div>
+            <Field
+              label="Password"
+              icon={Lock}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              required
+            />
 
-            {error ? (
-              <div
-                style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}
+            {/* Error */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8"
               >
-                {error}
-              </div>
-            ) : null}
+                <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
+                <span className="text-[#D91828] text-xs font-bold">{error}</span>
+              </motion.div>
+            )}
 
-            <button
-              className="sp-btn sp-btn-primary"
+            {/* Submit */}
+            <motion.button
               type="submit"
               disabled={loading}
-              style={{ width: "100%" }}
+              whileHover={{ scale: loading ? 1 : 1.02 }}
+              whileTap={{ scale: loading ? 1 : 0.97 }}
+              className="relative overflow-hidden group w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
+                clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+              }}
             >
-              {loading ? "Logging in..." : "Login"}
-            </button>
+              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                    Logging in...
+                  </>
+                ) : (
+                  <>
+                    Login <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </span>
+            </motion.button>
           </form>
 
-          <div
-            style={{ marginTop: 14, color: "var(--sp-muted)", fontWeight: 700 }}
-          >
-            No admin account?{" "}
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-[1px] bg-white/6" />
+            <span className="text-[9px] font-black tracking-[0.4em] text-white/20 uppercase">or</span>
+            <div className="flex-1 h-[1px] bg-white/6" />
+          </div>
+
+          {/* Create admin account */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black tracking-[0.25em] text-white/20 uppercase">
+              No admin account?
+            </span>
             <button
               type="button"
               onClick={() => navigate("/admin/signup")}
