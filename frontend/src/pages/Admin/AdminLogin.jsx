@@ -423,7 +423,24 @@ export default function AdminLogin() {
       setAuth({ token, ...user });
       navigate('/admin/dashboard');
     } catch (err) {
+<<<<<<< HEAD
       setError(err?.response?.data?.message || err.message || 'Authentication failed.');
+=======
+      const isNotVerified = err?.response?.data?.notVerified;
+
+      if (isNotVerified) {
+        setError("Account not verified. Redirecting...");
+
+        // This is the important part: passing 'state' so VerifyOtp can see the email
+        setTimeout(() => {
+          navigate("/verify-otp", { state: { email: email } });
+        }, 1500);
+      } else {
+        setError(
+          err?.response?.data?.message || err.message || "Login failed.",
+        );
+      }
+>>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
     } finally {
       setLoading(false);
     }
@@ -443,6 +460,52 @@ export default function AdminLogin() {
               <span className="al-badge-dot" />
               Admin Access
             </div>
+<<<<<<< HEAD
+=======
+
+            <div className="sp-field">
+              <div className="sp-label">Password</div>
+              <input
+                className="sp-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                placeholder="Your password"
+                required
+              />
+            </div>
+
+            {error ? (
+              <div
+                style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}
+              >
+                {error}
+              </div>
+            ) : null}
+
+            <button
+              className="sp-btn sp-btn-primary"
+              type="submit"
+              disabled={loading}
+              style={{ width: "100%" }}
+            >
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+
+          <div
+            style={{ marginTop: 14, color: "var(--sp-muted)", fontWeight: 700 }}
+          >
+            No admin account?{" "}
+            <button
+              type="button"
+              className="sp-btn sp-btn-secondary"
+              onClick={() => navigate("/admin/signup")}
+              style={{ padding: "8px 12px", marginLeft: 8 }}
+            >
+              Create Admin Account
+            </button>
+>>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
           </div>
           <h1 className="al-heading al-anim-up al-d1">
             Secure<br /><span>Command</span> Panel

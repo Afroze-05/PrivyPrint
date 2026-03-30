@@ -1,5 +1,8 @@
 function randomBase36(len) {
-  return Math.random().toString(36).slice(2, 2 + len).toUpperCase();
+  return Math.random()
+    .toString(36)
+    .slice(2, 2 + len)
+    .toUpperCase();
 }
 
 /**
@@ -20,4 +23,3 @@ function generateToken() {
 }
 
 module.exports = { generateToken };
-
