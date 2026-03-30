@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import CustomerSignup from "./pages/CustomerSignup";
 import UploadPage from "./pages/UploadPage";
 import TokenPage from "./pages/TokenPage";
+import LoginSelection from "./pages/LoginSelection";
 import AdminLogin from "./pages/Admin/AdminLogin";
 import AdminSignup from "./pages/Admin/AdminSignup";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
@@ -18,6 +19,7 @@ function App() {
       <Routes>
         {/* This sets PrivyPrint as your main page */}
         <Route path="/" element={<Landing />} />
+        <Route path="/login-selection" element={<LoginSelection />} />
 
         {/* Customer flow */}
         <Route path="/signup" element={<CustomerSignup />} />
@@ -65,3 +67,4 @@ function App() {
 }
 
 export default App;
+//app .jsx file

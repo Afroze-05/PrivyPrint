@@ -2,560 +2,317 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../services/api";
 import { setAuth } from "../../services/authStorage";
+import { motion } from "framer-motion";
+import { Mail, Lock, ShieldCheck, Cpu, ArrowLeft, ChevronRight } from "lucide-react";
 
-/* ─────────────────────────────────────────────
-   Styles — Admin variant of the shared design system
-   Darker, more authoritative than CustomerSignup.
-   Borrows the mono terminal aesthetic from Landing.
-───────────────────────────────────────────── */
-const ADMIN_LOGIN_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500&display=swap');
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-  *, *::before, *::after { box-sizing: border-box; }
+/* ── Dot-grid background ── */
+const GridDots = ({ color = "#D91828", opacity = 0.07 }) => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, ${color} 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity,
+    }}
+  />
+);
 
-  .al-root {
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    background: #080C18;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    position: relative;
-    overflow: hidden;
-  }
+/* ── Ambient glow orb ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{ scale: [1, 1.18, 1], opacity: [0.12, 0.22, 0.12] }}
+    transition={{ duration: 6, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
 
-  /* Ambient red/dark blobs — admin feels more dangerous than blue */
-  .al-root::before {
-    content: '';
-    position: fixed;
-    width: 650px; height: 650px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(217,24,40,0.08) 0%, transparent 68%);
-    top: -160px; left: -200px;
-    pointer-events: none;
-  }
-  .al-root::after {
-    content: '';
-    position: fixed;
-    width: 500px; height: 500px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(59,188,217,0.06) 0%, transparent 70%);
-    bottom: -100px; right: -130px;
-    pointer-events: none;
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#D91828]/25 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  /* Grain */
-  .al-grain {
-    position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-    background-size: 180px 180px;
-    opacity: 0.5;
-  }
-
-  /* Perspective grid */
-  .al-grid {
-    position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background-image:
-      linear-gradient(rgba(217,24,40,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(217,24,40,0.03) 1px, transparent 1px);
-    background-size: 52px 52px;
-    mask-image: radial-gradient(ellipse 55% 55% at 50% 50%, black 0%, transparent 100%);
-  }
-
-  /* Animations */
-  @keyframes al-fade-up {
-    from { opacity: 0; transform: translateY(24px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes al-scale-in {
-    from { opacity: 0; transform: scale(0.94); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-  @keyframes al-shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position: 200% center; }
-  }
-  @keyframes al-pulse-ring {
-    0%   { box-shadow: 0 0 0 0 rgba(217,24,40,0.5); }
-    70%  { box-shadow: 0 0 0 10px rgba(217,24,40,0); }
-    100% { box-shadow: 0 0 0 0 rgba(217,24,40,0); }
-  }
-  @keyframes al-shake {
-    0%, 100% { transform: translateX(0); }
-    20%       { transform: translateX(-5px); }
-    40%       { transform: translateX(5px); }
-    60%       { transform: translateX(-3px); }
-    80%       { transform: translateX(3px); }
-  }
-  @keyframes al-scan {
-    from { top: -100%; }
-    to   { top: 200%; }
-  }
-  @keyframes al-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-  }
-  @keyframes al-spin { to { transform: rotate(360deg); } }
-  @keyframes al-check-pop {
-    0%   { transform: scale(0) rotate(-15deg); opacity: 0; }
-    60%  { transform: scale(1.25) rotate(4deg); }
-    100% { transform: scale(1) rotate(0deg); opacity: 1; }
-  }
-
-  .al-anim-up    { animation: al-fade-up  0.55s cubic-bezier(0.22,1,0.36,1) both; }
-  .al-anim-scale { animation: al-scale-in 0.45s cubic-bezier(0.22,1,0.36,1) both; }
-  .al-d1 { animation-delay: 0.08s; }
-  .al-d2 { animation-delay: 0.16s; }
-  .al-d3 { animation-delay: 0.24s; }
-  .al-d4 { animation-delay: 0.32s; }
-  .al-d5 { animation-delay: 0.40s; }
-
-  /* Card */
-  .al-card {
-    position: relative; z-index: 1;
-    background: rgba(255,255,255,0.028);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-top: 1px solid rgba(217,24,40,0.35);
-    border-radius: 4px;
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.03) inset,
-      0 32px 80px rgba(0,0,0,0.6),
-      0 0 60px rgba(217,24,40,0.05);
-    padding: 2.75rem 2.5rem;
-    width: 100%;
-    max-width: 440px;
-  }
-
-  /* Top red accent bar */
-  .al-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #D91828, rgba(59,188,217,0.7), #D91828, transparent);
-    border-radius: 4px 4px 0 0;
-  }
-
-  /* Admin badge */
-  .al-badge {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    background: rgba(217,24,40,0.1);
-    border: 1px solid rgba(217,24,40,0.22);
-    padding: 0.28rem 0.8rem 0.28rem 0.42rem;
-    border-radius: 3px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem; font-weight: 500;
-    letter-spacing: 0.16em; text-transform: uppercase;
-    color: #F87171;
-    margin-bottom: 1.25rem;
-  }
-  .al-badge-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #D91828;
-    animation: al-pulse-ring 2.2s ease-out infinite;
-    box-shadow: 0 0 6px rgba(217,24,40,0.8);
-  }
-
-  /* Heading */
-  .al-heading {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 2.6rem;
-    letter-spacing: -0.01em; text-transform: uppercase; line-height: 0.95;
-    color: #F1F5FF; margin: 0;
-  }
-  .al-heading span { color: #D91828; }
-  .al-sub {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem; font-weight: 300;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: rgba(255,255,255,0.25);
-    margin-top: 0.5rem;
-  }
-
-  /* Divider */
-  .al-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(217,24,40,0.2), rgba(255,255,255,0.06), transparent);
-  }
-
-  /* Field label */
-  .al-label {
-    font-family: 'DM Mono', monospace;
-    font-weight: 500; font-size: 0.62rem;
-    letter-spacing: 0.18em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
-    margin-bottom: 0.5rem;
-    display: flex; align-items: center; gap: 0.5rem;
-  }
-  .al-label-tag {
-    font-size: 0.55rem; padding: 0.12rem 0.4rem;
-    background: rgba(217,24,40,0.1);
-    border: 1px solid rgba(217,24,40,0.18);
-    color: rgba(248,113,113,0.7);
-    border-radius: 2px; letter-spacing: 0.1em;
-  }
-
-  /* Input wrapper */
-  .al-input-wrap { position: relative; display: flex; align-items: center; }
-  .al-input-icon {
-    position: absolute; left: 13px;
-    font-size: 0.85rem; pointer-events: none;
-    opacity: 0.3; transition: opacity 0.2s;
-    font-family: 'DM Mono', monospace;
-  }
-  .al-input-valid {
-    position: absolute; right: 13px;
-    font-size: 0.8rem; color: #34D399; pointer-events: none;
-    animation: al-check-pop 0.35s ease both;
-  }
-  .al-input {
-    width: 100%;
-    padding: 0.72rem 2.25rem 0.72rem 2.6rem;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 3px;
-    color: #F1F5FF;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.82rem; font-weight: 300;
-    outline: none; caret-color: #D91828;
-    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-  }
-  .al-input::placeholder {
-    color: rgba(255,255,255,0.15);
-    font-style: italic;
-  }
-  .al-input:hover {
-    border-color: rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.05);
-  }
-  .al-input:focus {
-    border-color: rgba(217,24,40,0.5);
-    background: rgba(217,24,40,0.05);
-    box-shadow: 0 0 0 3px rgba(217,24,40,0.12);
-  }
-  .al-input.valid {
-    border-color: rgba(52,211,153,0.3);
-    background: rgba(52,211,153,0.04);
-  }
-  .al-input-wrap:focus-within .al-input-icon { opacity: 0.6; }
-
-  /* Cursor blink for mono inputs */
-  .al-input:focus { caret-color: #D91828; }
-
-  /* Error */
-  .al-error {
-    display: flex; align-items: flex-start; gap: 0.6rem;
-    background: rgba(217,24,40,0.08);
-    border: 1px solid rgba(217,24,40,0.22);
-    border-left: 3px solid #D91828;
-    border-radius: 3px;
-    padding: 0.7rem 0.85rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; font-weight: 400;
-    color: #FCA5A5; line-height: 1.5;
-    animation: al-shake 0.4s ease;
-  }
-  .al-error-pre {
-    font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #F87171; white-space: nowrap; padding-top: 0.15rem;
-  }
-
-  /* Submit */
-  .al-submit {
-    width: 100%;
-    padding: 0.9rem 1.5rem;
-    border: none; cursor: pointer;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1rem;
-    letter-spacing: 0.2em; text-transform: uppercase;
-    color: #fff;
-    background: linear-gradient(135deg, #B91C1C 0%, #D91828 50%, #B91C1C 100%);
-    background-size: 200% auto;
-    border-radius: 3px;
-    box-shadow: 0 4px 20px rgba(217,24,40,0.35), 0 1px 0 rgba(255,255,255,0.1) inset;
-    position: relative; overflow: hidden;
-    transition: all 0.22s ease;
-    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
-    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
-  }
-  .al-submit:hover:not(:disabled) {
-    background-position: right center;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(217,24,40,0.5), 0 1px 0 rgba(255,255,255,0.12) inset;
-  }
-  .al-submit:hover:not(:disabled)::after {
-    content: '';
-    position: absolute; width: 30px; height: 200%;
-    background: rgba(255,255,255,0.12);
-    transform: skewX(-20deg);
-    animation: al-shimmer 0.6s ease;
-  }
-  .al-submit:active:not(:disabled) { transform: translateY(0); }
-  .al-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-  .al-submit-icon {
-    width: 20px; height: 20px;
-    background: rgba(0,0,0,0.2);
-    border-radius: 2px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.7rem;
-  }
-  .al-spinner {
-    width: 15px; height: 15px;
-    border: 2px solid rgba(255,255,255,0.25);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: al-spin 0.65s linear infinite;
-  }
-
-  /* Footer nav */
-  .al-footer {
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 0.75rem;
-    padding-top: 0.25rem;
-  }
-  .al-footer-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; color: rgba(255,255,255,0.2);
-    letter-spacing: 0.05em;
-  }
-  .al-create-btn {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; font-weight: 500;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: #3BBCD9;
-    background: rgba(59,188,217,0.07);
-    border: 1px solid rgba(59,188,217,0.18);
-    border-radius: 3px;
-    padding: 0.4rem 0.85rem;
-    cursor: pointer;
-    transition: all 0.18s ease;
-  }
-  .al-create-btn:hover {
-    background: rgba(59,188,217,0.14);
-    border-color: rgba(59,188,217,0.35);
-    color: #7DD3FC;
-    transform: translateY(-1px);
-  }
-
-  /* Access level indicator */
-  .al-access-row {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.65rem 0.85rem;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 3px;
-  }
-  .al-access-icon {
-    font-size: 0.75rem; opacity: 0.5;
-  }
-  .al-access-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
-    color: rgba(255,255,255,0.22); flex: 1;
-  }
-  .al-access-level {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 0.18rem 0.5rem;
-    background: rgba(217,24,40,0.12);
-    border: 1px solid rgba(217,24,40,0.2);
-    color: #F87171; border-radius: 2px;
-  }
-
-  /* Trust row */
-  .al-trust-row {
-    display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
-    margin-top: 1.5rem;
-  }
-  .al-trust-badge {
-    display: flex; align-items: center; gap: 0.35rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem; letter-spacing: 0.06em;
-    color: rgba(255,255,255,0.2);
-    padding: 0.28rem 0.6rem;
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 3px;
-  }
-  .al-trust-dot {
-    width: 4px; height: 4px; border-radius: 50%;
-    background: rgba(217,24,40,0.6);
-  }
-
-  /* Form stack */
-  .al-form { display: flex; flex-direction: column; gap: 1.2rem; }
-  .al-field { display: flex; flex-direction: column; }
-`;
-
-function injectStyles() {
-  if (document.getElementById('admin-login-styles')) return;
-  const tag = document.createElement('style');
-  tag.id = 'admin-login-styles';
-  tag.textContent = ADMIN_LOGIN_CSS;
-  document.head.appendChild(tag);
-}
+/* ── Styled input field ── */
+const Field = ({ label, icon: Icon, type = "text", value, onChange, placeholder, required }) => (
+  <div className="flex flex-col gap-2">
+    <label className="text-[10px] font-black tracking-[0.45em] text-white/35 uppercase">
+      {label}
+    </label>
+    <div className="relative group">
+      {Icon && (
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+          <Icon className="w-4 h-4 text-white/20 group-focus-within:text-[#D91828] transition-colors duration-300" />
+        </div>
+      )}
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        className="w-full bg-[#0E1A21] border border-white/8 text-white text-sm font-medium
+          placeholder:text-white/20 focus:outline-none focus:border-[#D91828]/50
+          transition-all duration-300 py-4 pr-4 tracking-wide"
+        style={{
+          paddingLeft: Icon ? "2.75rem" : "1rem",
+          clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+        }}
+      />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#D91828]/0 group-focus-within:bg-[#D91828]/50 transition-all duration-300" />
+    </div>
+  </div>
+);
 
 export default function AdminLogin() {
   const navigate = useNavigate();
 
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
-
-  if (typeof window !== 'undefined') injectStyles();
-
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleLogin(e) {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post("/auth/login", { email, password });
       const { token, user } = res.data;
+
+      if (user.role !== "admin") {
+        setError("Access denied. Admin account required.");
+        return;
+      }
+
       setAuth({ token, ...user });
-      navigate('/admin/dashboard');
+      navigate("/admin/dashboard");
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Authentication failed.');
+      setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="al-root">
-      <div className="al-grain" />
-      <div className="al-grid" />
+    <div className="relative min-h-screen bg-[#0C1519] flex flex-col items-center justify-center px-6 overflow-hidden font-sans">
+      <NoiseSVG />
+      <GridDots />
+      <ScanLine />
+      <GlowOrb color="#D91828" size={480} top="-10%" left="-6%" delay={0} />
+      <GlowOrb color="#D9910D" size={360} top="45%" left="58%" delay={2} />
+      <GlowOrb color="#3BBCD9" size={220} top="68%" left="12%" delay={4} />
 
-      <div className="al-anim-up" style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 }}>
+      {/* Edge rules */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D91828]/30 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#3BBCD9]/20 to-transparent" />
+      <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D91828]/20 to-transparent" />
+      <div className="absolute top-0 right-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D9910D]/20 to-transparent" />
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="al-anim-scale" style={{ display: 'inline-block', marginBottom: '1rem' }}>
-            <div className="al-badge">
-              <span className="al-badge-dot" />
-              Admin Access
+      {/* System tag */}
+      <div className="absolute top-7 left-8 flex items-center gap-2">
+        <Cpu className="w-3.5 h-3.5 text-[#D91828]/40" />
+        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+          PrivyPrint OS v4.2
+        </span>
+      </div>
+
+      {/* Back button */}
+      <motion.button
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4 }}
+        onClick={() => navigate("/home")}
+        className="absolute top-7 right-8 flex items-center gap-2 text-white/20 hover:text-[#D91828] transition-colors duration-300 group"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform duration-300" />
+        <span className="text-[9px] font-black tracking-[0.45em] uppercase">Back</span>
+      </motion.button>
+
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-md"
+      >
+        {/* Eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-2.5 mb-8 px-5 py-2 border border-[#D91828]/25 bg-[#D91828]/5 w-fit"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D91828] animate-pulse shadow-[0_0_8px_#D91828]" />
+          <span className="text-[9px] font-black tracking-[0.55em] text-[#D91828]/80 uppercase">
+            Restricted Access
+          </span>
+        </motion.div>
+
+        {/* Title */}
+        <h1
+          style={{ fontFamily: '"BlockForce", ui-sans-serif, system-ui, monospace', lineHeight: 0.88 }}
+          className="text-5xl md:text-6xl font-black tracking-tighter text-white uppercase select-none mb-5"
+        >
+          Admin{" "}
+          <span
+            className="text-[#D91828]"
+            style={{ textShadow: "0 0 45px rgba(217,24,40,0.45)" }}
+          >
+            Login
+          </span>
+        </h1>
+        <div className="w-full h-[2px] bg-gradient-to-r from-[#D91828] via-[#D9910D] to-transparent mb-10" />
+
+        {/* Form panel */}
+        <div
+          className="relative bg-[#0E1A21] border border-white/6 p-8 overflow-hidden"
+          style={{ clipPath: "polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%)" }}
+        >
+          {/* Top bar */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#D91828] via-[#D9910D] to-transparent" />
+          {/* Chamfer corner */}
+          <div className="absolute top-0 right-0 w-[24px] h-[24px] border-t border-r border-[#D91828]/30" />
+          {/* Inner ambient */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "radial-gradient(ellipse at top left, rgba(217,24,40,0.04) 0%, transparent 60%)" }}
+          />
+
+          {/* Admin badge */}
+          <div className="flex items-center gap-3 mb-7 pb-6 border-b border-white/5">
+            <div className="p-2.5 bg-[#D91828]/10 border border-[#D91828]/20">
+              <ShieldCheck className="w-5 h-5 text-[#D91828]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-[0.4em] text-white/50 uppercase">
+                Administrator
+              </p>
+              <p className="text-[9px] text-white/20 font-medium tracking-wider mt-0.5">
+                Elevated privileges required
+              </p>
             </div>
           </div>
-          <h1 className="al-heading al-anim-up al-d1">
-            Secure<br /><span>Command</span> Panel
-          </h1>
-          <p className="al-sub al-anim-up al-d2">
-            Restricted · Authorised Personnel Only
-          </p>
-        </div>
 
-        {/* Card */}
-        <div className="al-card al-anim-up al-d2">
-          <form onSubmit={handleLogin} className="al-form">
+          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            <Field
+              label="Email"
+              icon={Mail}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              required
+            />
 
-            {/* Access level row */}
-            <div className="al-access-row al-anim-up al-d2">
-              <span className="al-access-icon">🛡</span>
-              <span className="al-access-text">Clearance Required</span>
-              <span className="al-access-level">Level · Admin</span>
-            </div>
-
-            <div className="al-divider" />
-
-            {/* Email */}
-            <div className="al-field al-anim-up al-d3">
-              <label className="al-label">
-                Email
-                <span className="al-label-tag">Required</span>
-              </label>
-              <div className="al-input-wrap">
-                <span className="al-input-icon">@</span>
-                <input
-                  className={`al-input${isEmailValid && email ? ' valid' : ''}`}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="admin@example.com"
-                  required
-                  autoComplete="username"
-                />
-                {isEmailValid && email && <span className="al-input-valid">✓</span>}
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="al-field al-anim-up al-d4">
-              <label className="al-label">
-                Password
-                <span className="al-label-tag">Required</span>
-              </label>
-              <div className="al-input-wrap">
-                <span className="al-input-icon">▶</span>
-                <input
-                  className={`al-input${password.length >= 6 ? ' valid' : ''}`}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type="password"
-                  placeholder="Enter credentials"
-                  required
-                  autoComplete="current-password"
-                />
-                {password.length >= 6 && <span className="al-input-valid">✓</span>}
-              </div>
-            </div>
-
-            <div className="al-divider" />
+            <Field
+              label="Password"
+              icon={Lock}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              required
+            />
 
             {/* Error */}
             {error && (
-              <div className="al-error">
-                <span className="al-error-pre">ERR</span>
-                {error}
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
+                <span className="text-[#D91828] text-xs font-bold">{error}</span>
+              </motion.div>
             )}
 
             {/* Submit */}
-            <button
+            <motion.button
               type="submit"
-              className="al-submit al-anim-up al-d4"
               disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02 }}
+              whileTap={{ scale: loading ? 1 : 0.97 }}
+              className="relative overflow-hidden group w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
+                clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+              }}
             >
-              {loading ? (
-                <>
-                  <div className="al-spinner" />
-                  Authenticating…
-                </>
-              ) : (
-                <>
-                  <span className="al-submit-icon">🔐</span>
-                  Authenticate
-                </>
-              )}
-            </button>
-
-            {/* Footer nav */}
-            <div className="al-footer al-anim-up al-d5">
-              <span className="al-footer-text">No admin account?</span>
-              <button
-                type="button"
-                className="al-create-btn"
-                onClick={() => navigate('/admin/signup')}
-              >
-                Create Admin Account
-              </button>
-            </div>
-
+              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                    Logging in...
+                  </>
+                ) : (
+                  <>
+                    Login <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </span>
+            </motion.button>
           </form>
-        </div>
 
-        {/* Trust badges */}
-        <div className="al-trust-row al-anim-up al-d5">
-          {['Restricted Access', 'Audit Logged', 'Session Encrypted'].map((t) => (
-            <div key={t} className="al-trust-badge">
-              <span className="al-trust-dot" />
-              {t}
-            </div>
-          ))}
-        </div>
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-[1px] bg-white/6" />
+            <span className="text-[9px] font-black tracking-[0.4em] text-white/20 uppercase">or</span>
+            <div className="flex-1 h-[1px] bg-white/6" />
+          </div>
 
-      </div>
+          {/* Create admin account */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black tracking-[0.25em] text-white/20 uppercase">
+              No admin account?
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate("/admin/signup")}
+              className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.3em] uppercase text-white/30 hover:text-[#D91828] transition-colors duration-300 group"
+            >
+              Create Account
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform duration-300" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Floating status indicator */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1 }}
+        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#D91828]/20 bg-[#0C1519]/90 backdrop-blur-md"
+        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+      >
+        <span className="text-[10px] font-black text-[#D91828] uppercase tracking-[0.35em]">
+          System Live
+        </span>
+        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+      </motion.div>
     </div>
   );
 }
