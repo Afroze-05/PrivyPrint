@@ -5,9 +5,7 @@ import { Shield, Printer, Lock, FileText } from "lucide-react";
 console.log(motion);
 
 // Fallback background image (so the app always builds even if bg2.gif isn't present).
-const bgGif =
-  "data:image/gif;base64,R0lGODlhAQABAAAAACw="; // 1x1 transparent gif
-
+const bgGif = "data:image/gif;base64,R0lGODlhAQABAAAAACw="; // 1x1 transparent gif
 
 function Landing() {
   const navigate = useNavigate();
@@ -55,7 +53,7 @@ function Landing() {
     <div
       ref={targetRef}
       className="relative h-[400vh] bg-[#26333B] overflow-visible font-sans"
-      style={{ position: 'relative' }}
+      style={{ position: "relative" }}
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         {/* === BASE LAYER: RED THEME WITH CUSTOM FONT === */}
@@ -153,14 +151,14 @@ function Landing() {
               <span className="text-[#D91828]">Secure Print</span>
             </h2>
 
-            <div className="flex flex-col sm:flex-row items-center gap-6">
+            {/* <div className="flex flex-col sm:flex-row items-center gap-6">
               <button
                 onClick={() => navigate("/home")}
                 className="bg-[#D91828] text-white px-14 py-5 font-black uppercase tracking-widest hover:bg-[#3BBCD9] transition-all transform hover:scale-105 active:scale-95"
               >
                 START
               </button>
-            </div>
+            </div> */}
           </div>
         </motion.section>
       </div>
