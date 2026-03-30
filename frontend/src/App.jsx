@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import CustomerSignup from "./pages/CustomerSignup";
+import CustomerLogin from "./pages/CustomerLogin"; // Added back
 import UploadPage from "./pages/UploadPage";
 import TokenPage from "./pages/TokenPage";
 import LoginSelection from "./pages/LoginSelection";
@@ -11,15 +12,20 @@ import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminPrintPanel from "./pages/Admin/AdminPrintPanel";
 import PrintLogsPage from "./pages/Admin/PrintLogsPage";
 import RequireAuth from "./components/RequireAuth";
+import VerifyOtp from "./pages/VerifyOtp"; // Added back
 import "./App.css";
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* This sets PrivyPrint as your main page */}
+        {/* Core Landing & Selection */}
         <Route path="/" element={<Landing />} />
         <Route path="/login-selection" element={<LoginSelection />} />
+
+        {/* Auth & Security flow */}
+        <Route path="/login" element={<CustomerLogin />} />
+        <Route path="/verify-otp" element={<VerifyOtp />} />
 
         {/* Customer flow */}
         <Route path="/signup" element={<CustomerSignup />} />
@@ -34,7 +40,7 @@ function App() {
         <Route path="/token" element={<TokenPage />} />
         <Route path="/home" element={<Home />} />
 
-        {/* Admin flow */}
+        {/* Admin flow (merged with Afroze's dashboard routes) */}
         <Route path="/admin/signup" element={<AdminSignup />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
@@ -67,4 +73,3 @@ function App() {
 }
 
 export default App;
-//app .jsx file
