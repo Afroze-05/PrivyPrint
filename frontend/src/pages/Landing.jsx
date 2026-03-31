@@ -716,7 +716,7 @@ function Landing() {
             </motion.button>
           </div>
         </motion.section>
-
+           //scrolling issue 
         {/* ── Floating status indicator ── */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
