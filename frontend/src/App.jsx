@@ -13,62 +13,68 @@ import AdminPrintPanel from "./pages/Admin/AdminPrintPanel";
 import PrintLogsPage from "./pages/Admin/PrintLogsPage";
 import RequireAuth from "./components/RequireAuth";
 import VerifyOtp from "./pages/VerifyOtp"; // Added back
+import { ThemeProvider } from "./contexts/ThemeContext";
+import ThemeToggle from "./components/ThemeToggle";
 import "./App.css";
+import "./theme.css";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Core Landing & Selection */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/login-selection" element={<LoginSelection />} />
+    <ThemeProvider>
+      <Router>
+        <ThemeToggle />
+        <Routes>
+          {/* Core Landing & Selection */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login-selection" element={<LoginSelection />} />
 
-        {/* Auth & Security flow */}
-        <Route path="/login" element={<CustomerLogin />} />
-        <Route path="/verify-otp" element={<VerifyOtp />} />
+          {/* Auth & Security flow */}
+          <Route path="/login" element={<CustomerLogin />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
 
-        {/* Customer flow */}
-        <Route path="/signup" element={<CustomerSignup />} />
-        <Route
-          path="/upload"
-          element={
-            <RequireAuth roles={["customer"]}>
-              <UploadPage />
-            </RequireAuth>
-          }
-        />
-        <Route path="/token" element={<TokenPage />} />
-        <Route path="/home" element={<Home />} />
+          {/* Customer flow */}
+          <Route path="/signup" element={<CustomerSignup />} />
+          <Route
+            path="/upload"
+            element={
+              <RequireAuth roles={["customer"]}>
+                <UploadPage />
+              </RequireAuth>
+            }
+          />
+          <Route path="/token" element={<TokenPage />} />
+          <Route path="/home" element={<Home />} />
 
-        {/* Admin flow (merged with Afroze's dashboard routes) */}
-        <Route path="/admin/signup" element={<AdminSignup />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route
-          path="/admin/dashboard"
-          element={
-            <RequireAuth roles={["admin"]}>
-              <AdminDashboard />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/print"
-          element={
-            <RequireAuth roles={["admin"]}>
-              <AdminPrintPanel />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/logs"
-          element={
-            <RequireAuth roles={["admin"]}>
-              <PrintLogsPage />
-            </RequireAuth>
-          }
-        />
-      </Routes>
-    </Router>
+          {/* Admin flow (merged with Afroze's dashboard routes) */}
+          <Route path="/admin/signup" element={<AdminSignup />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <RequireAuth roles={["admin"]}>
+                <AdminDashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/print"
+            element={
+              <RequireAuth roles={["admin"]}>
+                <AdminPrintPanel />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/logs"
+            element={
+              <RequireAuth roles={["admin"]}>
+                <PrintLogsPage />
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 
