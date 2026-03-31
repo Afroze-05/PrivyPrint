@@ -19,13 +19,11 @@ function App() {
   return (
     <Router>
       <Routes>
-<<<<<<< HEAD
         {/* Main Landing */}
         <Route path="/" element={<Landing />} />
         <Route path="/login-selection" element={<LoginSelection />} />
 
         {/* Customer Flow */}
-=======
         {/* Core Landing & Selection */}
         <Route path="/" element={<Landing />} />
         <Route path="/login-selection" element={<LoginSelection />} />
@@ -35,7 +33,6 @@ function App() {
         <Route path="/verify-otp" element={<VerifyOtp />} />
 
         {/* Customer flow */}
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
         <Route path="/signup" element={<CustomerSignup />} />
         <Route
           path="/upload"
@@ -48,11 +45,8 @@ function App() {
         <Route path="/token" element={<TokenPage />} />
         <Route path="/home" element={<Home />} />
 
-<<<<<<< HEAD
         {/* Admin Flow */}
-=======
         {/* Admin flow (merged with Afroze's dashboard routes) */}
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
         <Route path="/admin/signup" element={<AdminSignup />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
@@ -85,7 +79,6 @@ function App() {
 }
 
 export default App;
-<<<<<<< HEAD
 
 
 // import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
@@ -278,5 +271,3 @@ export default App;
 // }
 
 // export default App;
-=======
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5

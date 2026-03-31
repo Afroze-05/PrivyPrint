@@ -3,7 +3,6 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, Printer, Lock, FileText, Zap, Eye, Server } from "lucide-react";
 
-<<<<<<< HEAD
 /* ─────────────────────────────────────────────
    Global CSS injected once
 ───────────────────────────────────────────── */
@@ -357,10 +356,8 @@ function injectLandingStyles() {
   tag.textContent = LANDING_CSS;
   document.head.appendChild(tag);
 }
-=======
 // Fallback background image (so the app always builds even if bg2.gif isn't present).
 const bgGif = "data:image/gif;base64,R0lGODlhAQABAAAAACw="; // 1x1 transparent gif
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
 
 function Landing() {
   const navigate = useNavigate();
@@ -414,13 +411,8 @@ function Landing() {
   return (
     <div
       ref={targetRef}
-<<<<<<< HEAD
       className="lp-root"
       style={{ position: 'relative', height: '400vh', background: '#26333B', overflow: 'visible', fontFamily: 'sans-serif' }}
-=======
-      className="relative h-[400vh] bg-[#26333B] overflow-visible font-sans"
-      style={{ position: "relative" }}
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
     >
       {/* Grain overlay */}
       <div className="lp-grain" />
@@ -701,7 +693,6 @@ function Landing() {
               <span>Privy</span> Print
             </h2>
 
-<<<<<<< HEAD
             {/* Subtext */}
             <p style={{
               fontFamily: "'DM Mono', monospace",
@@ -736,7 +727,6 @@ function Landing() {
               <span style={{ color: 'rgba(52,211,153,0.5)' }}>●</span>
               No account required for guest print
             </div>
-=======
             {/* <div className="flex flex-col sm:flex-row items-center gap-6">
               <button
                 onClick={() => navigate("/home")}
@@ -745,7 +735,6 @@ function Landing() {
                 START
               </button>
             </div> */}
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
           </div>
 
         </motion.section>

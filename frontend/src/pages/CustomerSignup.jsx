@@ -1087,19 +1087,16 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { setAuth } from "../services/authStorage";
 
-<<<<<<< HEAD
 /* ─────────────────────────────────────────────────────────
    CSS — Sapphire × Gold luxury aesthetic
 ───────────────────────────────────────────────────────── */
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400;1,500&family=Poppins:wght@300;400;500;600;700&display=swap');
-=======
 export default function CustomerSignup() {
   const navigate = useNavigate();
 
   // Tab control from Afroze's version
   const [isLogin, setIsLogin] = useState(false);
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
 
   :root {
     --royal:       #112250;
@@ -1454,7 +1451,6 @@ export default function CustomerSignup() {
     setError('');
     setLoading(true);
     try {
-<<<<<<< HEAD
       await api.post('/auth/signup', { name, email, password, role: 'customer' });
       const loginRes = await api.post('/auth/login', { email, password });
       const { token, user } = loginRes.data;
@@ -1462,17 +1458,6 @@ export default function CustomerSignup() {
       navigate('/home');
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Signup failed.');
-=======
-      await api.post("/auth/signup", {
-        name,
-        email,
-        password,
-        role: "customer",
-      });
-      // Redirect to your OTP page with the email state
-      navigate("/verify-otp", { state: { email } });
-    } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Signup failed.");
     } finally {
       setLoading(false);
     }
@@ -1486,11 +1471,9 @@ export default function CustomerSignup() {
     try {
       const loginRes = await api.post("/auth/login", { email, password });
       const { token, user } = loginRes.data;
-
       setAuth({ token, ...user });
       navigate("/upload");
     } catch (err) {
-      // Check if backend says "notVerified"
       const isNotVerified = err?.response?.data?.notVerified;
       if (isNotVerified) {
         setError("Account not verified. Redirecting to OTP...");
@@ -1498,18 +1481,14 @@ export default function CustomerSignup() {
           navigate("/verify-otp", { state: { email } });
         }, 1500);
       } else {
-        setError(
-          err?.response?.data?.message || err.message || "Login failed.",
-        );
+        setError(err?.response?.data?.message || err.message || "Login failed.");
       }
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
     } finally {
       setLoading(false);
     }
   }
 
   return (
-<<<<<<< HEAD
     <div className="sg-page">
       <div className="sg-glow-tl" />
       <div className="sg-glow-br" />
@@ -1543,35 +1522,8 @@ export default function CustomerSignup() {
               <span className="sg-input-icon">👤</span>
               {nameValid && <span className="sg-valid-icon">✓</span>}
             </div>
-=======
-    <div className="sp-page">
-      <div className="sp-container">
-        <div className="sp-card" style={{ maxWidth: 560, margin: "0 auto" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>
-              {isLogin ? "Customer Login" : "Customer Signup"}
-            </h2>
-            <button
-              className="sp-btn sp-btn-secondary"
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError("");
-              }}
-            >
-              {isLogin ? "Switch to Signup" : "Switch to Login"}
-            </button>
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
           </div>
 
-<<<<<<< HEAD
           {/* Email */}
           <div className="sg-field">
             <label className="sg-label">Email Address</label>
@@ -1646,65 +1598,6 @@ export default function CustomerSignup() {
           <span className="sg-trust-item">🔐 Encrypted</span>
           <span className="sg-trust-item">🛡 Secure</span>
           <span className="sg-trust-item">⚡ Instant Access</span>
-=======
-          <form onSubmit={isLogin ? handleLogin : handleCreateAccount}>
-            {!isLogin && (
-              <div className="sp-field">
-                <div className="sp-label">Name</div>
-                <input
-                  className="sp-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  required
-                />
-              </div>
-            )}
-
-            <div className="sp-field">
-              <div className="sp-label">Email</div>
-              <input
-                className="sp-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-
-            <div className="sp-field">
-              <div className="sp-label">Password</div>
-              <input
-                className="sp-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder={
-                  isLogin ? "Your password" : "Create a strong password"
-                }
-                required
-              />
-            </div>
-
-            {error ? (
-              <div
-                style={{ color: "#ef4444", fontWeight: 700, marginBottom: 14 }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              className="sp-btn sp-btn-primary"
-              type="submit"
-              disabled={loading}
-              style={{ width: "100%" }}
-            >
-              {loading ? "Processing..." : isLogin ? "Login" : "Create Account"}
-            </button>
-          </form>
->>>>>>> 08ebd25f4785f9dbfc38a220f8af9a42603f50e5
         </div>
       </div>
     </div>

@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
     "bcrypt": "^6.0.0",
     "multer": "^2.1.1"
   }
