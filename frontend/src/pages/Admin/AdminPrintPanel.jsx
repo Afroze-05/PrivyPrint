@@ -151,17 +151,20 @@ export default function AdminPrintPanel() {
   async function handleFetchDocument() {
     setError(""); setPrintedSuccess(false); setTokenInvalid(false); setDoc(null);
     const token = tokenInput.trim();
+    console.log('🔍 AdminPrintPanel - Fetching document for token:', token);
     if (!token) { setError("Token is required."); return; }
     const currentAuth = getAuth();
     if (!currentAuth?.token) { navigate("/admin/login"); return; }
     setLoadingDoc(true);
     try {
       const res = await api.get(`/document/${encodeURIComponent(token)}`, { headers: authHeader(currentAuth.token) });
+      console.log('🔍 AdminPrintPanel - Document fetched:', res.data);
       setDoc(res.data);
       setWatermarkTime(new Date());
       setSecondsLeft(120);
       setIntervalActive(true);
     } catch (err) {
+      console.error('❌ AdminPrintPanel - Fetch error:', err);
       setError(err?.response?.data?.message || err.message || "Failed to fetch document.");
       setDoc(null); setIntervalActive(false);
     } finally {

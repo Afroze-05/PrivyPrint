@@ -102,7 +102,12 @@ export default function UploadPage() {
       });
 
       const { token, expiresAt, status } = res.data;
+      console.log('📤 UploadPage - API response:', res.data);
+      console.log('📤 UploadPage - Generated token:', token);
       setCustomerToken({ token, expiresAt, status: status || "waiting" });
+      localStorage.setItem('printType', type);
+      console.log('📤 UploadPage - Token stored in localStorage');
+      console.log('📤 UploadPage - Print type stored:', type);
       navigate("/token");
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Upload failed.");

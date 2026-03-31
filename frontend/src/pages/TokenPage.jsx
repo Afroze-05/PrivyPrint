@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Key, Cpu, Download, ArrowLeft, AlertTriangle, Timer } from 'lucide-react';
+import { getCustomerToken } from '../services/customerTokenStorage';
 
 /* ── Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -117,8 +118,13 @@ const Countdown = () => {
 
 export default function TokenPage() {
   const navigate = useNavigate();
-  const token = localStorage.getItem('activeToken') || 'SPX-0000';
+  const customerToken = getCustomerToken();
+  const token = customerToken?.token || 'SPX-0000';
   const type = localStorage.getItem('printType') || 'B/W';
+
+  // Debug logs
+  console.log('🔍 TokenPage - Retrieved customer token:', customerToken);
+  console.log('🔍 TokenPage - Displaying token:', token);
 
   return (
     <div className="relative min-h-screen bg-[#0C1519] flex flex-col items-center justify-center px-6 overflow-hidden font-sans">

@@ -13,8 +13,12 @@ async function generateUniqueDocumentToken() {
   // Try a handful of times to avoid collisions.
   for (let attempt = 0; attempt < 10; attempt++) {
     const token = generateToken();
+    console.log(` Token generation attempt ${attempt + 1}: ${token}`);
     const exists = await Document.exists({ token });
-    if (!exists) return token;
+    if (!exists) {
+      console.log(` Unique token generated: ${token}`);
+      return token;
+    }
   }
   throw new Error("Failed to generate a unique token. Please try again.");
 }
@@ -31,19 +35,26 @@ async function markExpiredIfNeeded(doc) {
 }
 
 async function getDocumentForVerification(token) {
+  console.log(`🔍 Document verification - Looking for token: ${token}`);
   const doc = await Document.findOne({ token }).populate("userId", "email name role");
-  if (!doc) return { ok: false, statusCode: 404, message: "Token not found." };
+  if (!doc) {
+    console.log(`❌ Document verification - Token not found: ${token}`);
+    return { ok: false, statusCode: 404, message: "Token not found." };
+  }
 
   await markExpiredIfNeeded(doc);
 
   if (doc.status === "expired") {
+    console.log(`❌ Document verification - Token expired: ${token}`);
     return { ok: false, statusCode: 410, message: "Token expired." };
   }
 
   if (doc.status === "completed") {
+    console.log(`❌ Document verification - Token already used: ${token}`);
     return { ok: false, statusCode: 409, message: "Token already used." };
   }
 
+  console.log(`✅ Document verification - Token valid: ${token}, status: ${doc.status}`);
   return { ok: true, document: doc };
 }
 
@@ -85,11 +96,15 @@ async function uploadDocument(req, res) {
       userId: req.user.id,
     });
 
-    return res.status(201).json({
+    console.log(`📄 Document created with token: ${doc.token}`);
+    const response = {
       token: doc.token,
       status: doc.status,
       expiresAt: doc.expiresAt,
-    });
+    };
+    console.log('📤 Upload response:', response);
+
+    return res.status(201).json(response);
   } catch (err) {
     return res.status(500).json({ message: "Upload failed.", error: err.message });
   }
