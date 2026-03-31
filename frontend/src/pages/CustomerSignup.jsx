@@ -1086,489 +1086,337 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { setAuth } from "../services/authStorage";
+import { motion, AnimatePresence } from "framer-motion";
+import { User, Mail, Lock, ChevronRight, Cpu, ArrowLeft } from "lucide-react";
 
-/* ─────────────────────────────────────────────────────────
-   CSS — Sapphire × Gold luxury aesthetic
-───────────────────────────────────────────────────────── */
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400;1,500&family=Poppins:wght@300;400;500;600;700&display=swap');
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-  :root {
-    --royal:       #112250;
-    --sapphire:    #3C507D;
-    --navy:        #0A192F;
-    --navy-deep:   #060F1E;
-    --gold:        #E0C58F;
-    --gold-mid:    #C9A85C;
-    --gold-dark:   #D4AD6E;
-    --gold-dim:    rgba(224,197,143,0.15);
-    --gold-border: rgba(224,197,143,0.22);
-    --gold-glow:   rgba(224,197,143,0.10);
-    --cream:       #F5F0E9;
-    --cream-dim:   rgba(245,240,233,0.55);
-    --cream-muted: rgba(245,240,233,0.30);
-    --border:      rgba(255,255,255,0.07);
-    --red-dim:     rgba(192,57,43,0.12);
-    --red-border:  rgba(192,57,43,0.28);
-    --serif:       'Cormorant Garamond', Georgia, serif;
-    --sans:        'Poppins', sans-serif;
-  }
+/* ── Dot-grid background ── */
+const GridDots = ({ color = "#3BBCD9", opacity = 0.08 }) => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, ${color} 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity,
+    }}
+  />
+);
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Ambient glow orb ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{ scale: [1, 1.18, 1], opacity: [0.12, 0.22, 0.12] }}
+    transition={{ duration: 6, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
 
-  .sg-page {
-    min-height: 100vh;
-    background: var(--navy-deep);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1.5rem;
-    position: relative;
-    overflow: hidden;
-    font-family: var(--sans);
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  /* diagonal hairlines texture */
-  .sg-page::before {
-    content: '';
-    position: absolute; inset: 0;
-    background-image: repeating-linear-gradient(
-      -45deg, transparent, transparent 40px,
-      rgba(224,197,143,0.018) 40px,
-      rgba(224,197,143,0.018) 41px
-    );
-    pointer-events: none;
-  }
-
-  .sg-glow-tl {
-    position: absolute; width: 700px; height: 700px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(60,80,125,0.20) 0%, transparent 65%);
-    top: -260px; left: -200px; pointer-events: none;
-  }
-  .sg-glow-br {
-    position: absolute; width: 600px; height: 600px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(17,34,80,0.30) 0%, transparent 65%);
-    bottom: -200px; right: -150px; pointer-events: none;
-  }
-  .sg-glow-gold {
-    position: absolute; width: 500px; height: 160px; border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(224,197,143,0.055) 0%, transparent 70%);
-    bottom: -30px; left: 50%; transform: translateX(-50%);
-    pointer-events: none;
-  }
-
-  /* ── Card ── */
-  .sg-card {
-    position: relative; z-index: 1;
-    width: 100%; max-width: 452px;
-    background: linear-gradient(155deg,
-      rgba(17,34,80,0.75) 0%,
-      rgba(6,15,30,0.88) 100%
-    );
-    backdrop-filter: blur(36px);
-    -webkit-backdrop-filter: blur(36px);
-    border: 1px solid var(--gold-border);
-    border-radius: 24px;
-    padding: 2.75rem 2.5rem;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.04) inset,
-      0 40px 90px rgba(0,0,0,0.65),
-      0 8px 32px rgba(0,0,0,0.4),
-      0 0 60px rgba(60,80,125,0.10);
-    animation: sgFadeUp 0.65s cubic-bezier(0.22,1,0.36,1) both;
-  }
-
-  .sg-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 18%; right: 18%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(224,197,143,0.55), transparent);
-  }
-
-  @keyframes sgFadeUp {
-    from { opacity: 0; transform: translateY(36px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ── Header ── */
-  .sg-header { text-align: center; margin-bottom: 2rem; }
-
-  .sg-emblem {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 54px; height: 54px; border-radius: 16px;
-    background: var(--gold-dim);
-    border: 1px solid var(--gold-border);
-    font-size: 1.5rem;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 0 28px var(--gold-glow), 0 0 0 6px rgba(224,197,143,0.04);
-    animation: sgFadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.08s both;
-  }
-
-  .sg-title {
-    font-family: var(--serif);
-    font-size: 2.15rem;
-    font-weight: 400;
-    letter-spacing: 0.02em;
-    color: var(--cream);
-    line-height: 1.2;
-    animation: sgFadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.14s both;
-  }
-
-  .sg-title em { font-style: italic; color: var(--gold); }
-
-  .sg-sub {
-    margin-top: 0.5rem;
-    font-size: 0.68rem;
-    font-weight: 300;
-    color: var(--cream-muted);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    animation: sgFadeUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.2s both;
-  }
-
-  /* ── Divider ── */
-  .sg-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(224,197,143,0.15), transparent);
-    margin: 0 0 1.75rem;
-  }
-
-  /* ── Form ── */
-  .sg-form { display: flex; flex-direction: column; gap: 1.2rem; }
-  .sg-field { display: flex; flex-direction: column; gap: 0.42rem; }
-
-  .sg-label {
-    font-size: 0.63rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--cream-muted);
-    padding-left: 1px;
-  }
-
-  .sg-input-wrap { position: relative; display: flex; align-items: center; }
-
-  .sg-input-icon {
-    position: absolute; left: 14px;
-    font-size: 0.82rem; opacity: 0.32;
-    pointer-events: none;
-    transition: opacity 0.2s;
-  }
-
-  .sg-input {
-    width: 100%;
-    padding: 0.78rem 2.5rem 0.78rem 2.6rem;
-    background: rgba(255,255,255,0.033);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--cream);
-    font-family: var(--sans);
-    font-size: 0.845rem;
-    font-weight: 400;
-    outline: none;
-    transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
-    caret-color: var(--gold);
-  }
-
-  .sg-input::placeholder { color: rgba(245,240,233,0.18); font-weight: 300; }
-
-  .sg-input:hover {
-    border-color: rgba(224,197,143,0.18);
-    background: rgba(255,255,255,0.05);
-  }
-
-  .sg-input:focus {
-    border-color: rgba(224,197,143,0.42);
-    background: rgba(224,197,143,0.035);
-    box-shadow: 0 0 0 3px rgba(224,197,143,0.07);
-  }
-
-  .sg-input:focus ~ .sg-input-icon { opacity: 0.6; }
-
-  .sg-input.valid {
-    border-color: rgba(110,231,183,0.3);
-    background: rgba(110,231,183,0.025);
-  }
-
-  .sg-valid-icon {
-    position: absolute; right: 13px;
-    font-size: 0.8rem; color: #6EE7B7;
-    pointer-events: none;
-    animation: sgCheckPop 0.3s ease both;
-  }
-
-  @keyframes sgCheckPop {
-    from { opacity: 0; transform: scale(0.4); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  /* ── Strength ── */
-  .sg-strength { margin-top: 0.38rem; }
-  .sg-strength-bars { display: flex; gap: 4px; }
-  .sg-strength-bar {
-    flex: 1; height: 2px; border-radius: 99px;
-    background: rgba(255,255,255,0.07);
-    transition: background 0.35s;
-  }
-  .sg-strength-bar.s-weak   { background: #C0392B; }
-  .sg-strength-bar.s-fair   { background: #C9930A; }
-  .sg-strength-bar.s-good   { background: #3C507D; }
-  .sg-strength-bar.s-strong { background: #6EE7B7; }
-  .sg-strength-label {
-    font-size: 0.63rem; font-weight: 400;
-    color: var(--cream-muted); margin-top: 0.28rem;
-    letter-spacing: 0.04em;
-  }
-
-  /* ── Error ── */
-  .sg-error {
-    display: flex; align-items: center; gap: 0.6rem;
-    background: var(--red-dim); border: 1px solid var(--red-border);
-    border-radius: 12px; padding: 0.7rem 1rem;
-    font-size: 0.775rem; font-weight: 500; color: #E88080;
-    animation: sgShake 0.4s ease;
-  }
-
-  @keyframes sgShake {
-    0%,100% { transform: translateX(0); }
-    20%     { transform: translateX(-5px); }
-    40%     { transform: translateX(5px); }
-    60%     { transform: translateX(-3px); }
-    80%     { transform: translateX(3px); }
-  }
-
-  .sg-error-dot { width: 6px; height: 6px; border-radius: 50%; background: #E88080; flex-shrink: 0; }
-
-  /* ── Button ── */
-  .sg-btn {
-    width: 100%; padding: 0.9rem 1.5rem;
-    border: 1px solid rgba(224,197,143,0.35);
-    border-bottom-color: rgba(224,197,143,0.5);
-    border-radius: 14px; cursor: pointer;
-    font-family: var(--sans);
-    font-size: 0.78rem; font-weight: 600;
-    letter-spacing: 0.13em; text-transform: uppercase;
-    color: var(--navy-deep);
-    background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold) 50%, var(--gold-mid) 100%);
-    box-shadow:
-      0 4px 24px rgba(224,197,143,0.18),
-      0 1px 0 rgba(255,255,255,0.18) inset,
-      0 -1px 0 rgba(0,0,0,0.1) inset;
-    position: relative; overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-  }
-
-  .sg-btn::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%);
-    background-size: 200% auto;
-    transform: translateX(-100%);
-    transition: transform 0.55s ease;
-  }
-
-  .sg-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(224,197,143,0.28), 0 1px 0 rgba(255,255,255,0.22) inset;
-  }
-  .sg-btn:hover:not(:disabled)::before { transform: translateX(100%); }
-  .sg-btn:active:not(:disabled) { transform: translateY(0); }
-  .sg-btn:disabled { opacity: 0.48; cursor: not-allowed; }
-
-  .sg-btn-inner { display: flex; align-items: center; justify-content: center; gap: 0.55rem; }
-
-  /* ── Spinner ── */
-  @keyframes sgSpin { to { transform: rotate(360deg); } }
-  .sg-spinner {
-    width: 15px; height: 15px;
-    border: 2px solid rgba(10,25,47,0.25);
-    border-top-color: var(--navy-deep);
-    border-radius: 50%;
-    animation: sgSpin 0.7s linear infinite;
-  }
-
-  /* ── Footer ── */
-  .sg-footer {
-    text-align: center; margin-top: 1.5rem;
-    font-size: 0.75rem; font-weight: 300; color: var(--cream-muted);
-  }
-  .sg-footer a { color: var(--gold); font-weight: 500; text-decoration: none; transition: opacity 0.2s; }
-  .sg-footer a:hover { opacity: 0.72; }
-
-  /* ── Trust row ── */
-  .sg-trust { display: flex; justify-content: center; gap: 1rem; margin-top: 1.75rem; flex-wrap: wrap; }
-  .sg-trust-item {
-    display: flex; align-items: center; gap: 0.3rem;
-    font-size: 0.6rem; font-weight: 400;
-    color: rgba(245,240,233,0.18);
-    letter-spacing: 0.08em; text-transform: uppercase;
-  }
-`;
+/* ── Styled input field ── */
+const Field = ({ label, icon: Icon, type = "text", value, onChange, placeholder, required }) => (
+  <div className="flex flex-col gap-2">
+    <label className="text-[10px] font-black tracking-[0.45em] text-white/35 uppercase">
+      {label}
+    </label>
+    <div className="relative group">
+      {Icon && (
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+          <Icon className="w-4 h-4 text-white/20 group-focus-within:text-[#3BBCD9] transition-colors duration-300" />
+        </div>
+      )}
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        className="w-full bg-[#0E1A21] border border-white/8 text-white text-sm font-medium placeholder:text-white/20
+          focus:outline-none focus:border-[#3BBCD9]/50 focus:bg-[#0E1A21]
+          transition-all duration-300 py-4 pr-4 tracking-wide"
+        style={{
+          paddingLeft: Icon ? "2.75rem" : "1rem",
+          clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+        }}
+      />
+      {/* Bottom glow on focus */}
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#3BBCD9]/0 group-focus-within:bg-[#3BBCD9]/50 transition-all duration-300" />
+    </div>
+  </div>
+);
 
 function injectCSS() {
-  if (document.getElementById('sg-styles')) return;
-  const el = document.createElement('style');
-  el.id = 'sg-styles';
-  el.textContent = CSS;
-  document.head.appendChild(el);
+  if (document.getElementById('customer-signup-css')) return;
+  // CSS injection point for any missing styles
 }
-
-function getStrength(pw) {
-  if (!pw) return { score: 0, label: '', tier: '' };
-  let s = 0;
-  if (pw.length >= 8)          s++;
-  if (/[A-Z]/.test(pw))        s++;
-  if (/[0-9]/.test(pw))        s++;
-  if (/[^A-Za-z0-9]/.test(pw)) s++;
-  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-  const tiers  = ['', 's-weak', 's-fair', 's-good', 's-strong'];
-  return { score: s, label: labels[s], tier: tiers[s] };
-}
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CustomerSignup() {
   injectCSS();
   const navigate = useNavigate();
-  const [name, setName]         = useState('');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [isLogin, setIsLogin] = useState(false);
 
-  const strength    = getStrength(password);
-  const nameValid   = name.trim().length > 1;
-  const emailValid  = emailRegex.test(email);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleCreateAccount(e) {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
     try {
-      await api.post('/auth/signup', { name, email, password, role: 'customer' });
-      const loginRes = await api.post('/auth/login', { email, password });
+      await api.post("/auth/signup", { name, email, password, role: "customer" });
+      const loginRes = await api.post("/auth/login", { email, password });
       const { token, user } = loginRes.data;
       setAuth({ token, ...user });
-      navigate('/home');
+      navigate("/upload");
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Signup failed.');
+      setError(err?.response?.data?.message || err.message || "Signup failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const loginRes = await api.post("/auth/login", { email, password });
+      const { token, user } = loginRes.data;
+      setAuth({ token, ...user });
+      navigate("/upload");
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="sg-page">
-      <div className="sg-glow-tl" />
-      <div className="sg-glow-br" />
-      <div className="sg-glow-gold" />
+    <div className="relative min-h-screen bg-[#0C1519] flex flex-col items-center justify-center px-6 overflow-hidden font-sans">
+      <NoiseSVG />
+      <GridDots />
+      <ScanLine />
+      <GlowOrb color="#3BBCD9" size={420} top="-8%" left="-5%" delay={0} />
+      <GlowOrb color="#D91828" size={340} top="50%" left="60%" delay={2} />
+      <GlowOrb color="#D9910D" size={220} top="70%" left="10%" delay={4} />
 
-      <div className="sg-card">
-        {/* Header */}
-        <div className="sg-header">
-          <div className="sg-emblem">💎</div>
-          <h1 className="sg-title">Create your <em>Account</em></h1>
-          <p className="sg-sub">Secure · Private · Instant</p>
-        </div>
+      {/* Edge rules */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D91828]/25 to-transparent" />
+      <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[#3BBCD9]/20 to-transparent" />
+      <div className="absolute top-0 right-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D91828]/20 to-transparent" />
 
-        <div className="sg-divider" />
-
-        {/* Form */}
-        <form className="sg-form" onSubmit={handleCreateAccount}>
-
-          {/* Name */}
-          <div className="sg-field">
-            <label className="sg-label">Full Name</label>
-            <div className="sg-input-wrap">
-              <input
-                className={`sg-input${nameValid ? ' valid' : ''}`}
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-              />
-              <span className="sg-input-icon">👤</span>
-              {nameValid && <span className="sg-valid-icon">✓</span>}
-            </div>
-          </div>
-
-          {/* Email */}
-          <div className="sg-field">
-            <label className="sg-label">Email Address</label>
-            <div className="sg-input-wrap">
-              <input
-                className={`sg-input${emailValid ? ' valid' : ''}`}
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-              <span className="sg-input-icon">✉️</span>
-              {emailValid && <span className="sg-valid-icon">✓</span>}
-            </div>
-          </div>
-
-          {/* Password */}
-          <div className="sg-field">
-            <label className="sg-label">Password</label>
-            <div className="sg-input-wrap">
-              <input
-                className="sg-input"
-                type="password"
-                placeholder="Create a strong password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-              <span className="sg-input-icon">🔒</span>
-            </div>
-            {password && (
-              <div className="sg-strength">
-                <div className="sg-strength-bars">
-                  {[1, 2, 3, 4].map(n => (
-                    <div
-                      key={n}
-                      className={`sg-strength-bar${strength.score >= n ? ` ${strength.tier}` : ''}`}
-                    />
-                  ))}
-                </div>
-                <div className="sg-strength-label">{strength.label}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="sg-error">
-              <div className="sg-error-dot" />
-              {error}
-            </div>
-          )}
-
-          {/* Submit */}
-          <button className="sg-btn" type="submit" disabled={loading}>
-            <div className="sg-btn-inner">
-              {loading && <div className="sg-spinner" />}
-              {loading ? 'Creating Account…' : 'Create Account'}
-            </div>
-          </button>
-        </form>
-
-        {/* Sign-in link */}
-        <p className="sg-footer">
-          Already have an account?{' '}
-          <a href="/admin/login">Sign in</a>
-        </p>
-
-        {/* Trust */}
-        <div className="sg-trust">
-          <span className="sg-trust-item">🔐 Encrypted</span>
-          <span className="sg-trust-item">🛡 Secure</span>
-          <span className="sg-trust-item">⚡ Instant Access</span>
-        </div>
+      {/* System tag */}
+      <div className="absolute top-7 left-8 flex items-center gap-2">
+        <Cpu className="w-3.5 h-3.5 text-[#3BBCD9]/40" />
+        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+          PrivyPrint OS v4.2
+        </span>
       </div>
+
+      {/* Back button */}
+      <motion.button
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4 }}
+        onClick={() => navigate("/home")}
+        className="absolute top-7 right-8 flex items-center gap-2 text-white/20 hover:text-[#3BBCD9] transition-colors duration-300 group"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform duration-300" />
+        <span className="text-[9px] font-black tracking-[0.45em] uppercase">Back</span>
+      </motion.button>
+
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-md"
+      >
+        {/* Eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-2.5 mb-8 px-5 py-2 border border-[#3BBCD9]/20 bg-[#3BBCD9]/4 w-fit"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D91828] animate-pulse shadow-[0_0_8px_#D91828]" />
+          <span className="text-[9px] font-black tracking-[0.55em] text-[#3BBCD9]/80 uppercase">
+            Customer Portal
+          </span>
+        </motion.div>
+
+        {/* Title */}
+        <h1
+          style={{ fontFamily: '"BlockForce", ui-sans-serif, system-ui, monospace', lineHeight: 0.88 }}
+          className="text-5xl md:text-6xl font-black tracking-tighter text-white uppercase select-none mb-2"
+        >
+          {isLogin ? (
+            <>Customer <span className="text-[#3BBCD9]" style={{ textShadow: "0 0 40px rgba(59,188,217,0.4)" }}>Login</span></>
+          ) : (
+            <>Create <span className="text-[#3BBCD9]" style={{ textShadow: "0 0 40px rgba(59,188,217,0.4)" }}>Account</span></>
+          )}
+        </h1>
+        <div className="w-full h-[2px] bg-gradient-to-r from-[#D91828] via-[#D9910D] to-[#3BBCD9] mb-10 mt-5" />
+
+        {/* Form panel */}
+        <div
+          className="relative bg-[#0E1A21] border border-white/6 p-8 overflow-hidden"
+          style={{ clipPath: "polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%)" }}
+        >
+          {/* Top bar */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#3BBCD9] to-transparent" />
+          {/* Chamfer corner */}
+          <div className="absolute top-0 right-0 w-[24px] h-[24px] border-t border-r border-[#3BBCD9]/30" />
+          {/* Inner ambient */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "radial-gradient(ellipse at top left, rgba(59,188,217,0.04) 0%, transparent 60%)" }}
+          />
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={isLogin ? "login" : "signup"}
+              initial={{ opacity: 0, x: isLogin ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: isLogin ? -20 : 20 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+            >
+              <form onSubmit={isLogin ? handleLogin : handleCreateAccount} className="flex flex-col gap-5">
+                {!isLogin && (
+                  <Field
+                    label="Name"
+                    icon={User}
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your full name"
+                    required
+                  />
+                )}
+
+                <Field
+                  label="Email"
+                  icon={Mail}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
+
+                <Field
+                  label="Password"
+                  icon={Lock}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isLogin ? "Your password" : "Create a strong password"}
+                  required
+                />
+
+                {/* Error */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
+                    <span className="text-[#D91828] text-xs font-bold">{error}</span>
+                  </motion.div>
+                )}
+
+                {/* Submit */}
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  whileHover={{ scale: loading ? 1 : 1.02 }}
+                  whileTap={{ scale: loading ? 1 : 0.97 }}
+                  className="relative overflow-hidden group w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
+                    clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+                  }}
+                >
+                  <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    {loading ? (
+                      <>
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                        />
+                        {isLogin ? "Logging in..." : "Creating..."}
+                      </>
+                    ) : (
+                      <>
+                        {isLogin ? "Login" : "Create Account"}
+                        <ChevronRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </span>
+                </motion.button>
+              </form>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-[1px] bg-white/6" />
+            <span className="text-[9px] font-black tracking-[0.4em] text-white/20 uppercase">or</span>
+            <div className="flex-1 h-[1px] bg-white/6" />
+          </div>
+
+          {/* Toggle mode */}
+          <button
+            type="button"
+            onClick={() => { setIsLogin(!isLogin); setError(""); }}
+            className="w-full py-3.5 border border-white/8 text-white/30 hover:text-[#3BBCD9] hover:border-[#3BBCD9]/30 transition-all duration-300 text-xs font-black uppercase tracking-[0.35em]"
+          >
+            {isLogin ? "Switch to Signup" : "Switch to Login"}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Floating status indicator */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1 }}
+        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#3BBCD9]/20 bg-[#0C1519]/90 backdrop-blur-md"
+        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+      >
+        <span className="text-[10px] font-black text-[#3BBCD9] uppercase tracking-[0.35em]">
+          System Live
+        </span>
+        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+      </motion.div>
     </div>
   );
 }

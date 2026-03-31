@@ -1,378 +1,201 @@
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, Printer, Lock, FileText, Zap, Eye, Server } from "lucide-react";
+import { Shield, Printer, Lock, FileText, ChevronDown, Cpu } from "lucide-react";
 
-/* ─────────────────────────────────────────────
-   Global CSS injected once
-───────────────────────────────────────────── */
-const LANDING_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap');
+const bgGif = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
-  .lp-root * { box-sizing: border-box; }
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-  /* ── Grain overlay ── */
-  .lp-grain {
-    position: fixed; inset: 0; z-index: 100; pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    background-size: 200px 200px;
-    mix-blend-mode: overlay;
-  }
+/* ── Dot-grid background ── */
+const GridDots = ({ color = "var(--accent)", opacity = 0.1 }) => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, ${color} 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity,
+    }}
+  />
+);
 
-  /* ── Status pill ── */
-  .lp-status {
-    position: fixed; top: 1.75rem; right: 1.75rem; z-index: 200;
-    display: flex; align-items: center; gap: 0.6rem;
-    background: rgba(38,51,59,0.85);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(59,188,217,0.2);
-    padding: 0.45rem 0.9rem 0.45rem 0.6rem;
-    border-radius: 100px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.12em;
-    color: #3BBCD9; text-transform: uppercase;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(59,188,217,0.1) inset;
-  }
-  .lp-status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #D91828;
-    box-shadow: 0 0 8px #D91828, 0 0 16px rgba(217,24,40,0.5);
-    animation: lp-pulse 1.8s ease-in-out infinite;
-  }
-  @keyframes lp-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.6; transform: scale(0.85); }
-  }
+/* ── Ambient glow orb with enhanced animation ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{
+      scale: [1, 1.2, 1.1, 1.3, 1],
+      opacity: [0.15, 0.25, 0.2, 0.3, 0.15],
+      x: [0, 20, -10, 15, 0],
+      y: [0, -15, 10, -5, 0],
+    }}
+    transition={{
+      duration: 8,
+      repeat: Infinity,
+      delay,
+      ease: "easeInOut",
+      times: [0, 0.25, 0.5, 0.75, 1],
+    }}
+  />
+);
 
-  /* ── Scroll indicator ── */
-  .lp-scroll-hint {
-    position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
-    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(59,188,217,0.4);
-    animation: lp-float 2.5s ease-in-out infinite;
-    z-index: 10;
-  }
-  .lp-scroll-track {
-    width: 1px; height: 40px;
-    background: linear-gradient(to bottom, rgba(59,188,217,0.5), transparent);
-  }
-  @keyframes lp-float {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50%       { transform: translateX(-50%) translateY(6px); }
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  /* ── Hero grid ── */
-  .lp-hero-grid {
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(59,188,217,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59,188,217,0.04) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%);
-  }
+/* ── Enhanced Feature card with 3D transformations ── */
+const FeatureCard = ({ icon, title, text, index }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 50, rotateX: 15, scale: 0.9 }}
+    whileInView={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+    transition={{ 
+      delay: index * 0.15, 
+      duration: 0.8,
+      type: "spring",
+      stiffness: 100,
+      damping: 15
+    }}
+    whileHover={{ 
+      y: -10,
+      scale: 1.02,
+      rotateX: -5,
+      rotateY: 5,
+      transition: { duration: 0.3, type: "spring", stiffness: 400 }
+    }}
+    className="group relative bg-orange-50 p-8 border border-orange-200 hover:border-orange-400 transition-all duration-500 overflow-hidden"
+    style={{ 
+      clipPath: "polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)",
+      transformStyle: "preserve-3d",
+      perspective: "1000px"
+    }}
+  >
+    {/* Enhanced Top color bar with animation */}
+    <motion.div 
+      className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[var(--accent)] to-transparent group-hover:from-[var(--accent-hover)] transition-all duration-500"
+      initial={{ scaleX: 0 }}
+      whileInView={{ scaleX: 1 }}
+      transition={{ delay: index * 0.15 + 0.3, duration: 0.5 }}
+    />
+    {/* Chamfer corner mark with animation */}
+    <motion.div 
+      className="absolute top-0 right-0 w-[22px] h-[22px] border-t border-r border-orange-300 group-hover:border-orange-500 transition-colors duration-300"
+      initial={{ opacity: 0, scale: 0 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.15 + 0.4, duration: 0.3 }}
+    />
+    {/* Enhanced Inner glow on hover */}
+    <motion.div 
+      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400"
+      style={{ background: "radial-gradient(ellipse at center, var(--accent-light) 0%, transparent 70%)" }}
+      animate={{ opacity: [0, 0, 0.3, 0] }}
+      transition={{ duration: 2, repeat: Infinity }}
+    />
+    {/* Floating particles on hover */}
+    <div className="absolute inset-0 overflow-hidden rounded-2xl">
+      {[...Array(6)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-1 h-1 bg-orange-500 rounded-full opacity-0 group-hover:opacity-60"
+          initial={{ 
+            x: Math.random() * 100, 
+            y: Math.random() * 100,
+            scale: 0
+          }}
+          whileHover={{
+            x: [Math.random() * 100, Math.random() * 100],
+            y: [Math.random() * 100, Math.random() * 100],
+            scale: [0, 1, 0],
+            opacity: [0, 1, 0]
+          }}
+          transition={{
+            duration: 2 + Math.random() * 2,
+            repeat: Infinity,
+            delay: Math.random() * 1
+          }}
+        />
+      ))}
+    </div>
 
-  /* ── Hero corner marks ── */
-  .lp-corner {
-    position: absolute; width: 22px; height: 22px;
-    border-color: rgba(59,188,217,0.35); border-style: solid;
-  }
-  .lp-corner-tl { top: 20px; left: 20px; border-width: 1.5px 0 0 1.5px; }
-  .lp-corner-tr { top: 20px; right: 20px; border-width: 1.5px 1.5px 0 0; }
-  .lp-corner-bl { bottom: 20px; left: 20px; border-width: 0 0 1.5px 1.5px; }
-  .lp-corner-br { bottom: 20px; right: 20px; border-width: 0 1.5px 1.5px 0; }
+    <div className="relative z-10">
+      {/* Icon with enhanced animation */}
+      <motion.div 
+        className="mb-5 w-fit p-3 bg-orange-100 border border-orange-300 group-hover:bg-orange-200 transition-all duration-300 rounded-full"
+        whileHover={{ 
+          rotate: 360,
+          scale: 1.1,
+          transition: { duration: 0.6, ease: "easeInOut" }
+        }}
+      >
+        {icon}
+      </motion.div>
+      {/* Title with stagger animation */}
+      <motion.h3
+        initial={{ opacity: 0, x: -20 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.15 + 0.2, duration: 0.5 }}
+        className="text-base font-black text-black mb-3 uppercase tracking-widest"
+        style={{ fontFamily: '"BlockForce", monospace' }}
+      >
+        {title}
+      </motion.h3>
+      {/* Description with fade-in */}
+      <motion.p 
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.15 + 0.3, duration: 0.5 }}
+        className="text-orange-500 leading-relaxed text-sm font-medium"
+      >
+        {text}
+      </motion.p>
+    </div>
 
-  /* ── Hero tagline ── */
-  .lp-tagline {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase;
-    color: rgba(59,188,217,0.55);
-    border: 1px solid rgba(59,188,217,0.15);
-    padding: 0.35rem 0.85rem;
-    border-radius: 4px;
-    display: inline-block;
-    background: rgba(59,188,217,0.04);
-  }
-
-  /* ── Brand title ── */
-  .lp-brand {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900;
-    font-size: clamp(5rem, 14vw, 10rem);
-    letter-spacing: -0.02em;
-    line-height: 0.9;
-    text-transform: uppercase;
-    color: #D91828;
-    text-shadow:
-      0 0 80px rgba(217,24,40,0.3),
-      4px 4px 0px rgba(0,0,0,0.4);
-    margin: 0;
-  }
-  .lp-brand span { color: #3BBCD9; text-shadow: 0 0 80px rgba(59,188,217,0.3), 4px 4px 0px rgba(0,0,0,0.4); }
-
-  .lp-brand-sub {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 600; font-size: 1.05rem;
-    letter-spacing: 0.5em; text-transform: uppercase;
-    color: rgba(59,188,217,0.65);
-    margin: 0;
-  }
-
-  /* ── Feature cards ── */
-  .lp-feat-card {
-    background: rgba(38,51,59,0.85);
-    border-top: 3px solid #D91828;
-    border-left: 1px solid rgba(255,255,255,0.06);
-    border-right: 1px solid rgba(255,255,255,0.06);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    padding: 2rem 1.75rem;
-    position: relative; overflow: hidden;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    cursor: default;
-  }
-  .lp-feat-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 80px;
-    background: linear-gradient(180deg, rgba(217,24,40,0.06) 0%, transparent 100%);
-    pointer-events: none;
-  }
-  .lp-feat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(217,24,40,0.25);
-  }
-  .lp-feat-num {
-    position: absolute; top: 1.25rem; right: 1.25rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem; letter-spacing: 0.12em; color: rgba(59,188,217,0.25);
-  }
-  .lp-feat-icon-wrap {
-    width: 48px; height: 48px;
-    background: rgba(59,188,217,0.08);
-    border: 1px solid rgba(59,188,217,0.15);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 1.25rem;
-  }
-  .lp-feat-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 800; font-size: 1.25rem;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    color: #3BBCD9; margin: 0 0 0.65rem 0;
-  }
-  .lp-feat-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; line-height: 1.65;
-    color: rgba(255,255,255,0.45); font-weight: 300; margin: 0;
-  }
-
-  /* ── Section heading ── */
-  .lp-section-h {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; text-transform: uppercase;
-    letter-spacing: -0.02em;
-    line-height: 0.9; margin: 0;
-  }
-
-  /* ── Stat block ── */
-  .lp-stat {
-    display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
-  }
-  .lp-stat-val {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: clamp(3rem, 6vw, 5rem);
-    letter-spacing: -0.03em; line-height: 1;
-  }
-  .lp-stat-unit {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); margin-top: 0.15rem;
-  }
-
-  /* ── Divider line ── */
-  .lp-hline {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-  }
-  .lp-vline {
-    width: 1px; align-self: stretch;
-    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.12), transparent);
-  }
-
-  /* ── Encryption badge ── */
-  .lp-enc-badge {
-    display: inline-flex; align-items: center; gap: 0.6rem;
-    border: 1px solid rgba(217,145,13,0.3);
-    background: rgba(217,145,13,0.07);
-    padding: 0.5rem 1rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(217,145,13,0.7);
-  }
-  .lp-enc-badge-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #D9910D;
-    box-shadow: 0 0 6px #D9910D;
-  }
-
-  /* ── CTA buttons ── */
-  .lp-btn-primary {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    color: #fff;
-    background: #D91828;
-    border: none; cursor: pointer;
-    padding: 1.1rem 2.75rem;
-    position: relative; overflow: hidden;
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    transition: background 0.22s, transform 0.18s, box-shadow 0.22s;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
-  }
-  .lp-btn-primary:hover {
-    background: #3BBCD9;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
-  }
-  .lp-btn-primary:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
-
-  .lp-btn-secondary {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    color: #26333B;
-    background: #3BBCD9;
-    border: none; cursor: pointer;
-    padding: 1.1rem 2.75rem;
-    position: relative; overflow: hidden;
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    transition: background 0.22s, transform 0.18s, box-shadow 0.22s;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
-  }
-  .lp-btn-secondary:hover {
-    background: #D91828;
-    color: #fff;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
-  }
-  .lp-btn-secondary:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
-
-  /* ── Panel 3 background stripes ── */
-  .lp-rust-stripes {
-    position: absolute; inset: 0; overflow: hidden; pointer-events: none;
-  }
-  .lp-rust-stripes::before {
-    content: '';
-    position: absolute; inset: -50%;
-    background: repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 40px,
-      rgba(0,0,0,0.06) 40px,
-      rgba(0,0,0,0.06) 80px
-    );
-  }
-
-  /* ── Panel 2 ── */
-  .lp-stats-grid {
-    display: flex; align-items: center; gap: 0;
-    border: 1px solid rgba(255,255,255,0.07);
-    background: rgba(38,51,59,0.6);
-    backdrop-filter: blur(8px);
-  }
-  .lp-stat-cell {
-    flex: 1; padding: 2.5rem 2rem; text-align: center;
-    position: relative;
-  }
-  .lp-stat-cell + .lp-stat-cell::before {
-    content: '';
-    position: absolute; top: 20%; left: 0;
-    height: 60%; width: 1px;
-    background: rgba(255,255,255,0.07);
-  }
-
-  /* ── Protocol list ── */
-  .lp-protocol-row {
-    display: flex; align-items: center; gap: 0.85rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
-  }
-  .lp-protocol-row:last-child { border-bottom: none; }
-  .lp-protocol-tag {
-    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 0.2rem 0.5rem;
-    background: rgba(217,24,40,0.12);
-    border: 1px solid rgba(217,24,40,0.2);
-    color: #F87171;
-    white-space: nowrap;
-  }
-
-  /* ── CTA card ── */
-  .lp-cta-card {
-    background: rgba(38,51,59,0.9);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-bottom: 4px solid #D91828;
-    padding: 3.5rem;
-    position: relative; overflow: hidden;
-    max-width: 640px; width: 100%;
-  }
-  .lp-cta-card::before {
-    content: '';
-    position: absolute; top: -60px; right: -60px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(217,24,40,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .lp-cta-h {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: clamp(3.5rem, 7vw, 6rem);
-    letter-spacing: -0.02em; text-transform: uppercase;
-    line-height: 0.9; margin: 0 0 0.1em 0;
-    color: #fff;
-  }
-  .lp-cta-h span { color: #D91828; }
-
-  /* Scan line effect on hover for buttons */
-  @keyframes lp-scan {
-    from { transform: translateY(-100%); }
-    to   { transform: translateY(100%); }
-  }
-  .lp-btn-primary:hover::after,
-  .lp-btn-secondary:hover::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
-    animation: lp-scan 0.5s ease;
-    pointer-events: none;
-  }
-`;
-
-function injectLandingStyles() {
-  if (document.getElementById('landing-page-styles')) return;
-  const tag = document.createElement('style');
-  tag.id = 'landing-page-styles';
-  tag.textContent = LANDING_CSS;
-  document.head.appendChild(tag);
-}
+    {/* Number with animation */}
+    <motion.div 
+      initial={{ opacity: 0, scale: 0 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.15 + 0.5, duration: 0.3 }}
+      className="absolute bottom-4 right-5 text-[10px] font-black text-[var(--text-muted)] tracking-widest"
+    >
+      0{index + 1}
+    </motion.div>
+  </motion.div>
+);
 
 function Landing() {
   const navigate = useNavigate();
   const targetRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
 
-  if (typeof window !== 'undefined') injectLandingStyles();
+  useEffect(() => { setMounted(true); }, []);
 
   const { scrollYProgress } = useScroll({
     target: targetRef,
     offset: ["start start", "end end"],
   });
 
-  const shutterSpring = { mass: 1.5, stiffness: 100, damping: 14, restDelta: 0.001 };
+  const shutterSpring = { mass: 1.5, stiffness: 90, damping: 14, restDelta: 0.001 };
 
   const rawY1 = useTransform(scrollYProgress, [0, 0.33], ["-100%", "0%"]);
   const rawY2 = useTransform(scrollYProgress, [0.33, 0.66], ["-100%", "0%"]);
-  const rawY3 = useTransform(scrollYProgress, [0.66, 1],  ["-100%", "0%"]);
+  const rawY3 = useTransform(scrollYProgress, [0.66, 1], ["-100%", "0%"]);
 
   const shutter1Y = useSpring(rawY1, shutterSpring);
   const shutter2Y = useSpring(rawY2, shutterSpring);
@@ -380,362 +203,548 @@ function Landing() {
 
   const features = [
     {
-      icon: <Shield size={20} color="#3BBCD9" />,
+      icon: <Shield className="w-7 h-7 text-[var(--accent)]" />,
       title: "Encrypted Node",
-      text: "Data packets shredded immediately post-transmission. Zero persistence on network nodes.",
-      num: "01",
+      text: "Data packets are shredded post-transmission.",
     },
     {
-      icon: <Printer size={20} color="#3BBCD9" />,
+      icon: <Printer className="w-7 h-7 text-[var(--accent)]" />,
       title: "Physical Link",
-      text: "Document released only via authenticated proximity token. No remote dispatch.",
-      num: "02",
+      text: "Release only via authenticated proximity.",
     },
     {
-      icon: <Lock size={20} color="#3BBCD9" />,
+      icon: <Lock className="w-7 h-7 text-[var(--accent)]" />,
       title: "Zero Cache",
-      text: "No residual memory retained on hardware. Cold-wipe after every print cycle.",
-      num: "03",
+      text: "No residual memory left on hardware.",
     },
-  ];
-
-  const protocols = [
-    { tag: "ENC", text: "AES-256-GCM symmetric encryption at rest" },
-    { tag: "TLS", text: "TLS 1.3 enforced on all transport layers" },
-    { tag: "AUTH", text: "TOTP proximity token with 90-second TTL" },
-    { tag: "PURGE", text: "Automatic data purge post-confirmation" },
   ];
 
   return (
     <div
       ref={targetRef}
-      className="lp-root"
-      style={{ position: 'relative', height: '400vh', background: '#26333B', overflow: 'visible', fontFamily: 'sans-serif' }}
+      className="relative h-[400vh] bg-[var(--bg-primary)] overflow-visible font-sans"
+      style={{ position: "relative" }}
     >
-      {/* Grain overlay */}
-      <div className="lp-grain" />
+      <div className="sticky top-0 h-screen w-full overflow-hidden">
 
-      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100%', overflow: 'hidden' }}>
+        {/* ═══════════════════════════════════
+            BASE LAYER — HERO
+        ═══════════════════════════════════ */}
+        <section className="absolute inset-0 z-0 flex flex-col items-center justify-center text-center px-6 bg-[var(--bg-primary)]">
+          <NoiseSVG />
+          <GridDots />
+          <ScanLine />
+          <GlowOrb color="var(--accent)" size={480} top="-8%" left="-6%" delay={0} />
+          <GlowOrb color="var(--accent-hover)" size={380} top="35%" left="62%" delay={2} />
+          <GlowOrb color="var(--warning)" size={260} top="60%" left="18%" delay={4} />
 
-        {/* ═══════════════════════════════════════
-            PANEL 0 — HERO
-        ════════════════════════════════════════ */}
-        <section
-          style={{
-            position: 'absolute', inset: 0, zIndex: 0,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            textAlign: 'center', padding: '2rem',
-            background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(59,188,217,0.06) 0%, transparent 60%), #26333B',
-          }}
-        >
-          {/* Grid background */}
-          <div className="lp-hero-grid" />
+          {/* Edge rules */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/25 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--warning)]/25 to-transparent" />
+          <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[var(--accent)]/20 to-transparent" />
 
-          {/* Corner marks */}
-          <div className="lp-corner lp-corner-tl" />
-          <div className="lp-corner lp-corner-tr" />
-          <div className="lp-corner lp-corner-bl" />
-          <div className="lp-corner lp-corner-br" />
+          {/* Minimal top-left system tag */}
+          <div className="absolute top-7 left-8 flex items-center gap-2">
+            <Cpu className="w-3.5 h-3.5 text-[var(--accent)]/40" />
+            <span className="text-[9px] font-black tracking-[0.45em] text-[var(--text-muted)] uppercase">
+              PrivyPrint OS v4.2
+            </span>
+          </div>
 
-          {/* Content */}
+          {/* Hero content */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}
+            animate={mounted ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 flex flex-col items-center space-y-6"
           >
-            {/* Tagline */}
+            {/* Eyebrow pill */}
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
+              initial={{ opacity: 0, y: -20, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.3, duration: 0.6, type: "spring", stiffness: 100 }}
+              whileHover={{ 
+                scale: 1.05,
+                boxShadow: "0 0 20px var(--accent-light)",
+                transition: { duration: 0.2 }
+              }}
+              className="flex items-center gap-2.5 mb-8 px-6 py-3 border border-[var(--accent)]/30 bg-[var(--accent)]/8 backdrop-blur-sm rounded-full"
             >
-              <span className="lp-tagline">Privacy-Protected Printing System</span>
+              <motion.span 
+                className="w-2 h-2 rounded-full bg-[var(--warning)] shadow-[0_0_12px_var(--warning)]"
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  opacity: [0.8, 1, 0.8]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+              <motion.span 
+                className="text-[10px] font-black tracking-[0.55em] text-[var(--accent)]/90 uppercase"
+                animate={{ opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                Secure Channel Active
+              </motion.span>
             </motion.div>
 
-            {/* Brand */}
+            {/* Wordmark */}
             <motion.h1
-              className="lp-brand"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.35, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0, scale: 0.8, rotateX: 15 }}
+              animate={mounted ? { opacity: 1, scale: 1, rotateX: 0 } : {}}
+              transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                fontFamily: '"BlockForce", ui-sans-serif, system-ui, monospace',
+                lineHeight: 0.88,
+                transformStyle: "preserve-3d",
+              }}
+              className="text-7xl md:text-9xl font-black tracking-tighter text-[var(--text-primary)] uppercase select-none"
             >
-              Privy<span>Print</span>
+              <motion.span
+                initial={{ x: -50, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ duration: 0.8, delay: 0.4 }}
+              >
+                Privy
+              </motion.span>
+              <span className="relative inline-block">
+                <motion.span
+                  className="text-[var(--accent)]"
+                  style={{ textShadow: "0 0 60px var(--accent-light)" }}
+                  animate={{ 
+                    textShadow: [
+                      "0 0 60px var(--accent-light)",
+                      "0 0 80px var(--accent-light)",
+                      "0 0 60px var(--accent-light)"
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  Print
+                </motion.span>
+                <motion.span
+                  className="absolute left-0 right-0 bottom-[-4px] h-[3px] bg-gradient-to-r from-[var(--warning)] via-[var(--accent-hover)] to-[var(--accent)]"
+                  initial={{ scaleX: 0, originX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.8, duration: 1, ease: "easeOut" }}
+                  whileInView={{ scaleX: [0, 1] }}
+                />
+                {/* Floating particles around "Print" */}
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-1 h-1 bg-[var(--accent)] rounded-full"
+                    initial={{ 
+                      x: 0,
+                      y: 0,
+                      opacity: 0,
+                      scale: 0
+                    }}
+                    animate={{
+                      x: [0, (Math.random() - 0.5) * 100],
+                      y: [0, (Math.random() - 0.5) * 100],
+                      opacity: [0, 1, 0],
+                      scale: [0, 1, 0],
+                    }}
+                    transition={{
+                      duration: 3 + Math.random() * 2,
+                      repeat: Infinity,
+                      delay: Math.random() * 2,
+                      ease: "easeInOut"
+                    }}
+                    style={{
+                      top: `${50 + (Math.random() - 0.5) * 100}%`,
+                      left: `${50 + (Math.random() - 0.5) * 100}%`,
+                    }}
+                  />
+                ))}
+              </span>
             </motion.h1>
 
+            {/* Tagline */}
             <motion.p
-              className="lp-brand-sub"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="text-lg md:text-xl font-bold text-[var(--accent)] tracking-[0.5em] uppercase"
+              style={{ textShadow: "0 0 20px var(--accent-light)" }}
             >
-              Secure · Encrypted · Ephemeral
+              {["Privacy-Protected", "Printing", "System"].map((word, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.7 + i * 0.1, duration: 0.5 }}
+                  className="inline-block mr-2"
+                >
+                  {word}
+                </motion.span>
+              ))}
             </motion.p>
 
-            {/* Subtle CTA hint */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1, duration: 0.6 }}
+            {/* CTA button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.9, duration: 0.6, type: "spring", stiffness: 100 }}
+              onClick={() => navigate("/home")}
+              whileHover={{ 
+                scale: 1.05,
+                boxShadow: "0 20px 40px var(--accent-light)",
+                transition: { duration: 0.2, type: "spring", stiffness: 400 }
+              }}
+              whileTap={{ scale: 0.95 }}
+              className="relative overflow-hidden group mt-8 px-16 py-6 font-black uppercase tracking-[0.4em] text-white text-sm"
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.62rem', letterSpacing: '0.2em', textTransform: 'uppercase',
-                color: 'rgba(59,188,217,0.35)', marginTop: '0.5rem',
+                background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)",
+                clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)",
+                transformStyle: "preserve-3d",
               }}
             >
-              <span>Scroll to explore</span>
-            </motion.div>
+              {/* Animated background gradient */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                animate={{
+                  x: ["-100%", "100%"],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+              {/* Button content */}
+              <motion.span 
+                className="relative z-10 flex items-center gap-3"
+                whileHover={{ x: 5 }}
+                transition={{ duration: 0.2 }}
+              >
+                Start
+                <motion.div
+                  initial={{ x: 0 }}
+                  whileHover={{ x: 3 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  →
+                </motion.div>
+              </motion.span>
+              {/* Glow effect on hover */}
+              <motion.div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: "radial-gradient(circle at center, var(--accent-light) 0%, transparent 70%)",
+                }}
+              />
+            </motion.button>
           </motion.div>
 
-          {/* Scroll indicator */}
-          <div className="lp-scroll-hint">
-            <div className="lp-scroll-track" />
-            <span>Scroll</span>
-          </div>
+          {/* Scroll hint */}
+          <motion.div
+            className="absolute bottom-9 flex flex-col items-center gap-2 text-white/15"
+            animate={{ y: [0, 7, 0] }}
+            transition={{ duration: 2.2, repeat: Infinity }}
+          >
+            <span className="text-[8px] tracking-[0.55em] uppercase font-black">Scroll</span>
+            <ChevronDown className="w-4 h-4" />
+          </motion.div>
         </section>
 
-
-        {/* ═══════════════════════════════════════
-            SHUTTER 1 — FEATURES (CYAN)
-        ════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════
+            SHUTTER 1 — FEATURES (Updated Design)
+        ═══════════════════════════════════ */}
         <motion.section
-          style={{
-            y: shutter1Y,
-            position: 'absolute', inset: 0, zIndex: 10,
-            background: '#3BBCD9',
-            display: 'flex', alignItems: 'center',
-            padding: '3rem clamp(1.5rem, 6vw, 5rem)',
-            borderBottom: '8px solid rgba(38,51,59,0.3)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.5)',
-          }}
+          style={{ y: shutter1Y }}
+          className="absolute inset-0 z-10 flex items-center px-10 md:px-32 shadow-2xl"
         >
-          {/* Subtle dot pattern */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            backgroundImage: 'radial-gradient(rgba(38,51,59,0.12) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }} />
+          <div className="absolute inset-0 bg-[#7B1509]" />
+          <NoiseSVG />
+          <GridDots color="var(--accent)" opacity={0.08} />
+          <GlowOrb color="var(--accent)" size={550} top="-20%" left="-8%" delay={0} />
+          <GlowOrb color="var(--warning)" size={300} top="55%" left="70%" delay={3} />
 
-          <div style={{ width: '100%', maxWidth: '1280px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* Left accent stripe */}
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-[var(--accent)] via-[var(--warning)]/60 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[var(--accent)]/40 via-[var(--warning)]/20 to-transparent" />
 
-            {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '3rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <div style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase',
-                  color: 'rgba(38,51,59,0.5)', marginBottom: '0.6rem',
-                }}>
-                  Core Architecture
-                </div>
-                <h2 className="lp-section-h" style={{ color: '#26333B', fontSize: 'clamp(3.5rem, 6vw, 6rem)' }}>
-                  Hardened<br />Privacy.
-                </h2>
-              </div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.68rem', lineHeight: 1.7,
-                color: 'rgba(38,51,59,0.55)',
-                maxWidth: '260px', textAlign: 'right',
-              }}>
-                Every print job is treated as a security event.<br />Nothing persists beyond the session.
-              </div>
-            </div>
-
-            {/* Feature cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1px', background: 'rgba(38,51,59,0.15)' }}>
-              {features.map((f, i) => (
-                <div key={i} className="lp-feat-card">
-                  <span className="lp-feat-num">{f.num}</span>
-                  <div className="lp-feat-icon-wrap">{f.icon}</div>
-                  <h3 className="lp-feat-title">{f.title}</h3>
-                  <p className="lp-feat-text">{f.text}</p>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </motion.section>
-
-
-        {/* ═══════════════════════════════════════
-            SHUTTER 2 — STATS + PROTOCOLS (DARK)
-        ════════════════════════════════════════ */}
-        <motion.section
-          style={{
-            y: shutter2Y,
-            position: 'absolute', inset: 0, zIndex: 20,
-            background: '#1A2229',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '3rem clamp(1.5rem, 6vw, 5rem)',
-            borderBottom: '8px solid rgba(0,0,0,0.4)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
-            gap: '2.5rem',
-          }}
-        >
-          {/* Top label */}
-          <div style={{ textAlign: 'center' }}>
-            <div className="lp-enc-badge">
-              <span className="lp-enc-badge-dot" />
-              Military-Grade Encryption Standard
-            </div>
-          </div>
-
-          {/* Main heading */}
-          <div style={{ textAlign: 'center', marginTop: '-2rem' }}>
-            <h2 className="lp-section-h" style={{ color: '#D9910D', fontSize: 'clamp(4rem, 9vw, 4rem)' }}>
-              Locked<br /><span style={{ color: '#D91828' }}>Pad.</span>
-            </h2>
-          </div>
-
-          {/* Stats row */}
-          <div className="lp-stats-grid" style={{ width: '100%', maxWidth: '680px' , height: '160px', marginBottom: '2.5rem', marginTop: '-2rem' }}>
-            <div className="lp-stat-cell"
+          <div className="relative z-10 w-full max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+            {/* Left side - Heading */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              className="space-y-6"
             >
-              <div className="lp-stat-val" style={{ color: '#3BBCD9' }}>AES</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#3BBCD9', letterSpacing: '0.1em',
-              }}>256-Bit</div>
-              <div className="lp-stat-unit">Encryption</div>
-            </div>
-            <div className="lp-stat-cell">
-              <div className="lp-stat-val" style={{ color: '#D91828' }}>0</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#F87171', letterSpacing: '0.1em',
-              }}>Bytes</div>
-              <div className="lp-stat-unit">Retained</div>
-            </div>
-            <div className="lp-stat-cell">
-              <div className="lp-stat-val" style={{ color: '#D9910D' }}>90s</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#FCD34D', letterSpacing: '0.1em',
-              }}>Token TTL</div>
-              <div className="lp-stat-unit">Expiry</div>
-            </div>
-          </div>
+              {/* Section label */}
+              <motion.div 
+                className="flex items-center gap-3"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <motion.div 
+                  className="h-px w-10 bg-[var(--accent)]"
+                  initial={{ scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  transition={{ delay: 0.3 }}
+                />
+                <motion.span 
+                  className="text-[10px] tracking-[0.55em] font-black text-[var(--accent)]/70 uppercase"
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  Core Architecture
+                </motion.span>
+              </motion.div>
 
-          {/* Protocol list */}
-          <div style={{ width: '100%', maxWidth: '680px',height: 'auto', padding: '0 1rem', marginTop: '-4rem' }}>
-            <div style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.2)', marginBottom: '0.75rem', 
-            }}>
-              Active Protocols
-            </div>
-            {protocols.map((p, i) => (
-              <div key={i} className="lp-protocol-row">
-                <span className="lp-protocol-tag">{p.tag}</span>
-                <span>{p.text}</span>
-              </div>
-            ))}
-          </div>
+              {/* Main heading */}
+              <motion.h2
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.8 }}
+                className="text-5xl md:text-6xl font-black text-black uppercase leading-[0.9]"
+                style={{ fontFamily: '"BlockForce", monospace' }}
+              >
+                Hardened{" "}
+                <br />
+                <motion.span
+                  className="text-[var(--accent)]"
+                  style={{ textShadow: "0 0 40px var(--accent-light)" }}
+                  animate={{ 
+                    textShadow: [
+                      "0 0 40px var(--accent-light)",
+                      "0 0 60px var(--accent-light)",
+                      "0 0 40px var(--accent-light)"
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  Privacy.
+                </motion.span>
+              </motion.h2>
 
+              {/* Description text */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                className="text-black/80 text-lg leading-relaxed max-w-md"
+              >
+                Advanced security architecture with multi-layered encryption and zero-knowledge protocols.
+              </motion.p>
+            </motion.div>
+
+            {/* Right side - Feature cards */}
+            <motion.div 
+              className="grid md:grid-cols-1 gap-6"
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              {features.map((f, i) => (
+                <FeatureCard key={i} {...f} index={i} />
+              ))}
+            </motion.div>
+          </div>
         </motion.section>
 
-
-        {/* ═══════════════════════════════════════
-            SHUTTER 3 — CTA (RUST)
-        ════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════
+            SHUTTER 2 — ENCRYPTION (Full Screen GIF)
+        ═══════════════════════════════════ */}
         <motion.section
-          style={{
-            y: shutter3Y,
-            position: 'absolute', inset: 0, zIndex: 30,
-            background: '#0E1519',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            padding: '3rem 1.5rem',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.7)',
-          }}
+          style={{ y: shutter2Y }}
+          className="absolute inset-0 z-20 flex items-center justify-center px-10 md:px-32"
         >
-          {/* Stripe texture */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
-          }}>
-            <div style={{
-              position: 'absolute', inset: '-50%',
-              background: `repeating-linear-gradient(-45deg, transparent, transparent 60px, rgba(217,24,40,0.025) 60px, rgba(217,24,40,0.025) 61px)`,
-            }} />
+          <div className="absolute inset-0 bg-[#A72906]" />
+          <NoiseSVG />
+          <GridDots color="var(--accent)" opacity={0.08} />
+          <GlowOrb color="var(--accent)" size={650} top="-15%" left="25%" delay={0} />
+          <GlowOrb color="var(--warning)" size={350} top="45%" left="-5%" delay={2} />
+
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-[var(--accent)] via-[var(--warning)]/60 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[var(--accent)]/40 to-transparent" />
+
+          <div className="relative z-10 w-full h-full flex items-center justify-center">
+            {/* Full Screen GIF Container */}
+            <motion.div
+              className="relative w-full h-full max-w-7xl mx-auto"
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8 }}
+            >
+              {/* GIF without background - perfectly centered */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img 
+                  src="/bg2.gif" 
+                  alt="Encryption Demo"
+                  className="max-w-full max-h-full object-contain"
+                  onLoad={() => console.log("GIF loaded successfully")}
+                  onError={() => console.log("GIF failed to load")}
+                />
+              </div>
+              {/* Optional overlay text */}
+              <div className="absolute bottom-8 left-8 text-white/80">
+                <span className="text-xs font-black uppercase tracking-widest">Encryption Process Active</span>
+              </div>
+            </motion.div>
           </div>
-
-          {/* Large accent glow */}
-          <div style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '600px', height: '400px',
-            background: 'radial-gradient(ellipse, rgba(217,24,40,0.08) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
-
-          <div className="lp-cta-card">
-
-            {/* File icon badge */}
-            <div style={{
-              width: 52, height: 52,
-              background: 'rgba(217,24,40,0.12)',
-              border: '1px solid rgba(217,24,40,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: '1.75rem',
-            }}>
-              <FileText size={24} color="#F87171" />
-            </div>
-
-            {/* Heading */}
-            <h2 className="lp-cta-h">
-              Initialize<br />
-              <span>Privy</span> Print
-            </h2>
-
-            {/* Subtext */}
-            <p style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.72rem', lineHeight: 1.75,
-              color: 'rgba(255,255,255,0.3)',
-              margin: '1.5rem 0 2.25rem 0',
-              maxWidth: 400,
-            }}>
-              Upload your document, choose print parameters, and receive a one-time secure release token.
-            </p>
-
-            <div className="lp-hline" style={{ marginBottom: '2.25rem' }} />
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-              <button className="lp-btn-primary" onClick={() => navigate('/signup')}>
-                Start Printing
-              </button>
-              <button className="lp-btn-secondary" onClick={() => navigate('/admin/login')}>
-                Admin Login
-              </button>
-            </div>
-
-            {/* Mono note */}
-            <div style={{
-              marginTop: '2rem',
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.6rem', letterSpacing: '0.12em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-            }}>
-              <span style={{ color: 'rgba(52,211,153,0.5)' }}>●</span>
-              No account required for guest print
-            </div>
-          </div>
-
         </motion.section>
 
+        {/* ═══════════════════════════════════
+            SHUTTER 3 — FINAL CTA (Updated Design)
+        ═══════════════════════════════════ */}
+        <motion.section
+          style={{ y: shutter3Y }}
+          className="absolute inset-0 z-30 flex items-center px-10 md:px-32"
+        >
+          <div className="absolute inset-0 bg-[var(--bg-primary)]" />
+          <NoiseSVG />
+          <GridDots color="var(--accent)" opacity={0.08} />
+          <GlowOrb color="var(--accent)" size={560} top="5%" left="8%" delay={0} />
+          <GlowOrb color="var(--warning)" size={440} top="30%" left="55%" delay={2} />
+
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-[var(--accent)] via-[var(--warning)]/50 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[var(--accent)]/40 to-transparent" />
+
+          <div className="relative z-10 w-full max-w-4xl mx-auto text-center">
+            {/* Label */}
+            <motion.div 
+              className="flex items-center justify-center gap-3 mb-8"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <motion.div 
+                className="h-px w-10 bg-[var(--accent)]"
+                initial={{ scaleX: 0 }}
+                whileInView={{ scaleX: 1 }}
+                transition={{ delay: 0.3 }}
+              />
+              <motion.span 
+                className="text-[10px] tracking-[0.55em] font-black text-[var(--accent)]/70 uppercase"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                Ready to Deploy
+              </motion.span>
+              <motion.div 
+                className="h-px w-10 bg-[var(--accent)]"
+                initial={{ scaleX: 0 }}
+                whileInView={{ scaleX: 1 }}
+                transition={{ delay: 0.3 }}
+              />
+            </motion.div>
+
+            {/* Main heading */}
+            <motion.h2
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+              className="text-5xl md:text-7xl font-black text-[var(--text-primary)] text-center leading-tight mb-12 uppercase"
+              style={{ fontFamily: '"BlockForce", monospace' }}
+            >
+              Initialize <br />{" "}
+              <motion.span
+                className="text-[var(--accent)]"
+                style={{ textShadow: "0 0 40px var(--accent-light)" }}
+                animate={{ 
+                  textShadow: [
+                    "0 0 40px var(--accent-light)",
+                    "0 0 60px var(--accent-light)",
+                    "0 0 40px var(--accent-light)"
+                  ]
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                Secure Print
+              </motion.span>
+            </motion.h2>
+
+            {/* Get Started Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.6, type: "spring", stiffness: 100 }}
+              onClick={() => navigate("/home")}
+              whileHover={{ 
+                scale: 1.05,
+                boxShadow: "0 20px 40px var(--accent-light)",
+                transition: { duration: 0.2, type: "spring", stiffness: 400 }
+              }}
+              whileTap={{ scale: 0.95 }}
+              className="relative overflow-hidden group px-16 py-6 font-black uppercase tracking-[0.4em] text-white text-sm"
+              style={{
+                background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)",
+                clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)",
+                transformStyle: "preserve-3d",
+              }}
+            >
+              {/* Animated background gradient */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                animate={{
+                  x: ["-100%", "100%"],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+              {/* Button content */}
+              <motion.span 
+                className="relative z-10 flex items-center gap-3"
+                whileHover={{ x: 5 }}
+                transition={{ duration: 0.2 }}
+              >
+                GET STARTED
+                <motion.div
+                  initial={{ x: 0 }}
+                  whileHover={{ x: 3 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  →
+                </motion.div>
+              </motion.span>
+              {/* Glow effect on hover */}
+              <motion.div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: "radial-gradient(circle at center, var(--accent-light) 0%, transparent 70%)",
+                }}
+              />
+            </motion.button>
+          </div>
+        </motion.section>
+           //scrolling issue 
+        {/* ── Floating status indicator ── */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 1 }}
+          className="fixed top-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#3BBCD9]/20 bg-[#0C1519]/90 backdrop-blur-md"
+          style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+        >
+          <span className="text-[10px] font-black text-[#3BBCD9] uppercase tracking-[0.35em]">
+            System Live
+          </span>
+          <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+        </motion.div>
       </div>
 
-      {/* ── Floating status pill ── */}
-      <div className="lp-status">
-        <span className="lp-status-dot" />
-        System Live
-      </div>
+      {/* ── Floating status indicator ── */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1 }}
+        className="fixed top-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#3BBCD9]/20 bg-[#0C1519]/90 backdrop-blur-md"
+        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+      >
+        <span className="text-[10px] font-black text-[#3BBCD9] uppercase tracking-[0.35em]">
+          System Live
+        </span>
+        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+      </motion.div>
     </div>
   );
 }

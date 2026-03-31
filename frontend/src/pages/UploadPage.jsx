@@ -1,489 +1,408 @@
+import { useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, authHeader } from "../services/api";
+import { getAuth } from "../services/authStorage";
+import { setCustomerToken } from "../services/customerTokenStorage";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Upload, FileText, Printer, Hash, Cpu,
+  ArrowLeft, ChevronRight, X, ImageIcon,
+} from "lucide-react";
 
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+/* ── Dot-grid background ── */
+const GridDots = () => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, #3BBCD9 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity: 0.08,
+    }}
+  />
+);
 
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
+/* ── Ambient glow orb ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{ scale: [1, 1.18, 1], opacity: [0.12, 0.22, 0.12] }}
+    transition={{ duration: 6, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
 
-  :root {
-    --bg:         #070D1A;
-    --bg2:        #0B1221;
-    --surface:    rgba(255,255,255,0.03);
-    --surface2:   rgba(255,255,255,0.06);
-    --border:     rgba(255,255,255,0.08);
-    --border-hi:  rgba(56,139,253,0.5);
-    --blue:       #388BFD;
-    --blue-glow:  rgba(56,139,253,0.3);
-    --blue-dim:   rgba(56,139,253,0.12);
-    --cyan:       #58D8FF;
-    --green:      #3FB950;
-    --green-glow: rgba(63,185,80,0.25);
-    --muted:      #4A5568;
-    --text:       #CDD9E5;
-    --text-dim:   #768390;
-    --mono:       'Share Tech Mono', monospace;
-    --display:    'Barlow Condensed', sans-serif;
-    --body:       'Inter', sans-serif;
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  .up-page {
-    min-height: 100vh;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1.25rem;
-    font-family: var(--body);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .up-page::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(56,139,253,0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(56,139,253,0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%);
-    pointer-events: none;
-  }
-
-  .up-page::after {
-    content: '';
-    position: absolute;
-    width: 600px; height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(56,139,253,0.07) 0%, transparent 65%);
-    top: -100px; left: -150px;
-    pointer-events: none;
-  }
-
-  .up-blob {
-    position: absolute;
-    width: 500px; height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(88,216,255,0.05) 0%, transparent 65%);
-    bottom: -150px; right: -100px;
-    pointer-events: none;
-  }
-
-  .up-wrap {
-    width: 100%;
-    max-width: 460px;
-    position: relative;
-    z-index: 1;
-    animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(28px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .up-header { text-align: center; margin-bottom: 1.75rem; }
-
-  .up-logo {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 99px;
-    padding: 0.35rem 1rem 0.35rem 0.55rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .up-logo-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--blue);
-    box-shadow: 0 0 8px var(--blue-glow);
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.4; }
-  }
-
-  .up-logo-text {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.12em;
-  }
-
-  .up-title {
-    font-family: var(--display);
-    font-size: 2.6rem;
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.05;
-    letter-spacing: -0.01em;
-    text-transform: uppercase;
-  }
-
-  .up-title span { color: var(--blue); }
-
-  .up-sub {
-    margin-top: 0.5rem;
-    font-size: 0.72rem;
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-family: var(--mono);
-  }
-
-  .up-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 1.75rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .up-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 10%; right: 10%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--blue), transparent);
-  }
-
-  .up-drop {
-    border: 1.5px dashed var(--border);
-    border-radius: 14px;
-    padding: 2.25rem 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    background: var(--surface);
-    transition: border-color 0.2s, background 0.2s, transform 0.15s;
-    margin-bottom: 1.5rem;
-  }
-
-  .up-drop:hover,
-  .up-drop.drag-over {
-    border-color: var(--blue);
-    background: var(--blue-dim);
-    transform: translateY(-2px);
-  }
-
-  .up-drop.has-file {
-    border-color: var(--green);
-    background: rgba(63,185,80,0.06);
-  }
-
-  .up-drop input { display: none; }
-  .up-drop label { display: block; cursor: pointer; }
-
-  .up-drop-icon {
-    font-size: 2.4rem;
-    display: block;
-    margin-bottom: 0.6rem;
-    line-height: 1;
-    filter: drop-shadow(0 0 8px var(--blue-glow));
-  }
-
-  .up-drop-title {
-    font-family: var(--display);
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .up-drop-hint {
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    margin-top: 0.4rem;
-    letter-spacing: 0.1em;
-  }
-
-  .up-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: 0.65rem;
-  }
-
-  .up-label::before {
-    content: '';
-    display: inline-block;
-    width: 12px; height: 1px;
-    background: var(--blue);
-  }
-
-  .up-modes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.65rem;
-    margin-bottom: 1.4rem;
-  }
-
-  .up-mode-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    padding: 0.85rem 1rem;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-dim);
-    font-family: var(--body);
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-  }
-
-  .up-mode-btn:hover:not(.active) {
-    border-color: rgba(56,139,253,0.25);
-    background: var(--surface2);
-    color: var(--text);
-  }
-
-  .up-mode-btn.active {
-    border-color: var(--blue);
-    background: var(--blue-dim);
-    color: var(--blue);
-    box-shadow: 0 0 16px rgba(56,139,253,0.15), inset 0 0 12px rgba(56,139,253,0.06);
-  }
-
-  .up-mode-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem;
-    background: var(--surface2);
-    flex-shrink: 0;
-  }
-
-  .up-mode-btn.active .up-mode-icon {
-    background: rgba(56,139,253,0.15);
-  }
-
-  .up-mode-info { display: flex; flex-direction: column; gap: 1px; }
-  .up-mode-name { font-weight: 600; font-size: 0.82rem; }
-  .up-mode-desc { font-size: 0.68rem; opacity: 0.6; }
-
-  .up-input-group { margin-bottom: 1.5rem; }
-
-  .up-input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--surface);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 0.88rem;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    -moz-appearance: textfield;
-  }
-
-  .up-input::-webkit-inner-spin-button,
-  .up-input::-webkit-outer-spin-button { opacity: 0; }
-
-  .up-input:focus {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgba(56,139,253,0.12);
-    background: rgba(56,139,253,0.04);
-  }
-
-  .up-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 1.25rem 0;
-  }
-
-  .up-btn {
-    width: 100%;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--border-hi);
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(56,139,253,0.2) 0%, rgba(56,139,253,0.08) 100%);
-    color: var(--blue);
-    font-family: var(--display);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
-  }
-
-  .up-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(56,139,253,0.1) 50%, transparent 100%);
-    transform: translateX(-100%);
-    transition: transform 0.6s ease;
-  }
-
-  .up-btn:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, rgba(56,139,253,0.3) 0%, rgba(56,139,253,0.15) 100%);
-    box-shadow: 0 0 24px rgba(56,139,253,0.25), 0 4px 16px rgba(0,0,0,0.3);
-  }
-
-  .up-btn:hover::before { transform: translateX(100%); }
-  .up-btn:active { transform: translateY(0); }
-
-  .up-footer {
-    margin-top: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-family: var(--mono);
-    font-size: 0.62rem;
-    color: var(--muted);
-    letter-spacing: 0.08em;
-  }
-
-  .up-footer-dot {
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green-glow);
-  }
-`;
+/* ── Section label ── */
+const SectionLabel = ({ children }) => (
+  <div className="flex items-center gap-3 mb-3">
+    <div className="h-px w-6 bg-[#3BBCD9]/50" />
+    <span className="text-[9px] font-black tracking-[0.5em] text-white/30 uppercase">{children}</span>
+  </div>
+);
 
 export default function UploadPage() {
   const navigate = useNavigate();
+  const auth = useMemo(() => getAuth(), []);
+  const fileInputRef = useRef(null);
+
   const [file, setFile] = useState(null);
-  const [printType, setPrintType] = useState('B/W');
+  const [type, setType] = useState("B/W");
+  const [copies, setCopies] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
-  const handleUpload = (e) => {
-    e.preventDefault();
-    const randomToken = `SPX-${Math.floor(1000 + Math.random() * 9000)}`;
-    localStorage.setItem('activeToken', randomToken);
-    localStorage.setItem('printType', printType);
-    navigate('/token');
-  };
-
-  const handleDrop = (e) => {
+  function handleFileDrop(e) {
     e.preventDefault();
     setDragOver(false);
-    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
-  };
+    const dropped = e.dataTransfer?.files?.[0];
+    if (dropped) setFile(dropped);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (!auth?.token) throw new Error("Missing authentication token.");
+      if (!file) throw new Error("Please select a PDF or image file.");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+      formData.append("copies", String(copies));
+
+      const res = await api.post("/upload", formData, {
+        headers: {
+          ...authHeader(auth.token),
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const { token, expiresAt, status } = res.data;
+      console.log('📤 UploadPage - API response:', res.data);
+      console.log('📤 UploadPage - Generated token:', token);
+      setCustomerToken({ token, expiresAt, status: status || "waiting" });
+      localStorage.setItem('printType', type);
+      console.log('📤 UploadPage - Token stored in localStorage');
+      console.log('📤 UploadPage - Print type stored:', type);
+      navigate("/token");
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Upload failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const isPDF = file?.type === "application/pdf";
+  const fileSizeKB = file ? (file.size / 1024).toFixed(1) : null;
 
   return (
-    <>
-      <style>{styles}</style>
-      <div className="up-page">
-        <div className="up-blob" />
+    <div className="relative min-h-screen bg-[#0C1519] flex flex-col items-center justify-center px-6 py-12 overflow-hidden font-sans">
+      <NoiseSVG />
+      <GridDots />
+      <ScanLine />
+      <GlowOrb color="#3BBCD9" size={460} top="-8%" left="-6%" delay={0} />
+      <GlowOrb color="#D91828" size={340} top="50%" left="62%" delay={2} />
+      <GlowOrb color="#D9910D" size={220} top="70%" left="10%" delay={4} />
 
-        <div className="up-wrap">
-          {/* Header */}
-          <div className="up-header">
-            <div className="up-logo">
-              <div className="up-logo-dot" />
-              <span className="up-logo-text">PRIVYPRINT · UPLOAD</span>
-            </div>
-            <h1 className="up-title">
-              Upload<br /><span>Document</span>
-            </h1>
-            <p className="up-sub">Encrypted · Auto-deleted after print</p>
-          </div>
+      {/* Edge rules */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#3BBCD9]/25 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D91828]/20 to-transparent" />
+      <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[#3BBCD9]/20 to-transparent" />
+      <div className="absolute top-0 right-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D91828]/15 to-transparent" />
 
-          {/* Card */}
-          <div className="up-card">
-            <form onSubmit={handleUpload}>
+      {/* System tag */}
+      <div className="absolute top-7 left-8 flex items-center gap-2">
+        <Cpu className="w-3.5 h-3.5 text-[#3BBCD9]/40" />
+        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+          PrivyPrint OS v4.2
+        </span>
+      </div>
 
-              {/* Drop zone */}
-              <div
-                className={`up-drop${dragOver ? ' drag-over' : ''}${file ? ' has-file' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-              >
+      {/* Back */}
+      <motion.button
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4 }}
+        onClick={() => navigate("/home")}
+        className="absolute top-7 right-8 flex items-center gap-2 text-white/20 hover:text-[#3BBCD9] transition-colors duration-300 group"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform duration-300" />
+        <span className="text-[9px] font-black tracking-[0.45em] uppercase">Back</span>
+      </motion.button>
+
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xl"
+      >
+        {/* Eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-2.5 mb-8 px-5 py-2 border border-[#3BBCD9]/20 bg-[#3BBCD9]/4 w-fit"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D91828] animate-pulse shadow-[0_0_8px_#D91828]" />
+          <span className="text-[9px] font-black tracking-[0.55em] text-[#3BBCD9]/80 uppercase">
+            Secure Upload
+          </span>
+        </motion.div>
+
+        {/* Title */}
+        <h1
+          style={{ fontFamily: '"BlockForce", ui-sans-serif, system-ui, monospace', lineHeight: 0.88 }}
+          className="text-5xl md:text-6xl font-black tracking-tighter text-white uppercase select-none mb-5"
+        >
+          Upload{" "}
+          <span className="text-[#3BBCD9]" style={{ textShadow: "0 0 45px rgba(59,188,217,0.4)" }}>
+            Document
+          </span>
+        </h1>
+        <div className="w-full h-[2px] bg-gradient-to-r from-[#3BBCD9] via-[#D9910D] to-transparent mb-8" />
+
+        {/* Form panel */}
+        <form onSubmit={handleSubmit}>
+          <div
+            className="relative bg-[#0E1A21] border border-white/6 p-7 overflow-hidden"
+            style={{ clipPath: "polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%)" }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#3BBCD9] via-[#D9910D] to-transparent" />
+            <div className="absolute top-0 right-0 w-[24px] h-[24px] border-t border-r border-[#3BBCD9]/30" />
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at top left, rgba(59,188,217,0.04) 0%, transparent 60%)" }} />
+
+            <div className="relative z-10 flex flex-col gap-7">
+
+              {/* ── File drop zone ── */}
+              <div>
+                <SectionLabel>File Upload (PDF / Image)</SectionLabel>
                 <input
+                  ref={fileInputRef}
                   type="file"
-                  id="file-upload"
-                  onChange={(e) => setFile(e.target.files[0])}
+                  accept="application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
-                <label htmlFor="file-upload">
-                  <span className="up-drop-icon">
-                    {file ? '✅' : dragOver ? '📂' : '📁'}
-                  </span>
-                  <p className="up-drop-title">
-                    {file ? file.name : 'Drag & drop or click to browse'}
-                  </p>
-                  <p className="up-drop-hint">PDF · DOCX · PNG — MAX 10 MB</p>
-                </label>
+                <motion.div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleFileDrop}
+                  animate={{ borderColor: dragOver ? "rgba(59,188,217,0.5)" : "rgba(255,255,255,0.07)" }}
+                  className="relative cursor-pointer border border-dashed border-white/8 hover:border-[#3BBCD9]/40 transition-all duration-300 p-8 flex flex-col items-center gap-3 bg-[#0C1519]/60"
+                  style={{ clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)" }}
+                >
+                  {dragOver && (
+                    <motion.div
+                      className="absolute inset-0 pointer-events-none"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      style={{ background: "rgba(59,188,217,0.04)" }}
+                    />
+                  )}
+
+                  <AnimatePresence mode="wait">
+                    {file ? (
+                      <motion.div
+                        key="file"
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="flex items-center gap-4 w-full"
+                      >
+                        <div className="p-3 bg-[#3BBCD9]/10 border border-[#3BBCD9]/20 flex-shrink-0">
+                          {isPDF
+                            ? <FileText className="w-6 h-6 text-[#3BBCD9]" />
+                            : <ImageIcon className="w-6 h-6 text-[#3BBCD9]" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white truncate">{file.name}</p>
+                          <p className="text-[10px] text-white/30 font-bold tracking-widest mt-0.5 uppercase">
+                            {isPDF ? "PDF Document" : "Image"} · {fileSizeKB} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                          className="p-1.5 border border-white/10 hover:border-[#D91828]/40 text-white/20 hover:text-[#D91828] transition-all duration-200"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="empty"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="flex flex-col items-center gap-3 text-center"
+                      >
+                        <div className="p-4 bg-[#3BBCD9]/6 border border-[#3BBCD9]/15">
+                          <Upload className="w-7 h-7 text-[#3BBCD9]/60" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-white/40 uppercase tracking-widest">
+                            Drop file here
+                          </p>
+                          <p className="text-[10px] text-white/20 font-bold tracking-widest mt-1 uppercase">
+                            or click to browse · PDF / Image
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               </div>
 
-              {/* Print mode */}
+              {/* ── Print type ── */}
               <div>
-                <div className="up-label">Print Mode</div>
-                <div className="up-modes">
-                  {[
-                    { type: 'B/W', icon: '◼', name: 'Black & White', desc: 'Standard · Faster' },
-                    { type: 'Color', icon: '🎨', name: 'Full Color', desc: 'Vibrant · Premium' },
-                  ].map(({ type, icon, name, desc }) => (
-                    <button
-                      key={type}
+                <SectionLabel>Select Type</SectionLabel>
+                <div className="grid grid-cols-2 gap-3">
+                  {["B/W", "Color"].map((opt) => (
+                    <motion.button
+                      key={opt}
                       type="button"
-                      onClick={() => setPrintType(type)}
-                      className={`up-mode-btn${printType === type ? ' active' : ''}`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setType(opt)}
+                      className="relative flex items-center gap-3 p-4 border transition-all duration-300 overflow-hidden"
+                      style={{
+                        borderColor: type === opt ? "rgba(59,188,217,0.5)" : "rgba(255,255,255,0.07)",
+                        background: type === opt ? "rgba(59,188,217,0.06)" : "transparent",
+                        clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                      }}
                     >
-                      <div className="up-mode-icon">{icon}</div>
-                      <div className="up-mode-info">
-                        <span className="up-mode-name">{name}</span>
-                        <span className="up-mode-desc">{desc}</span>
-                      </div>
-                    </button>
+                      {type === opt && (
+                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[#3BBCD9] to-transparent" />
+                      )}
+                      <Printer
+                        className="w-4 h-4 transition-colors duration-300"
+                        style={{ color: type === opt ? "#3BBCD9" : "rgba(255,255,255,0.2)" }}
+                      />
+                      <span
+                        className="text-xs font-black uppercase tracking-[0.3em] transition-colors duration-300"
+                        style={{ color: type === opt ? "white" : "rgba(255,255,255,0.3)" }}
+                      >
+                        {opt}
+                      </span>
+                      {/* Selected dot */}
+                      <div
+                        className="ml-auto w-2 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          background: type === opt ? "#3BBCD9" : "transparent",
+                          boxShadow: type === opt ? "0 0 6px #3BBCD9" : "none",
+                          border: type === opt ? "none" : "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      />
+                    </motion.button>
                   ))}
                 </div>
               </div>
 
-              {/* Copies */}
-              <div className="up-input-group">
-                <div className="up-label">Number of Copies</div>
-                <input
-                  className="up-input"
-                  type="number"
-                  defaultValue="1"
-                  min="1"
-                />
+              {/* ── Copies ── */}
+              <div>
+                <SectionLabel>Number of Copies</SectionLabel>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Hash className="w-4 h-4 text-white/20 group-focus-within:text-[#3BBCD9] transition-colors duration-300" />
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={copies}
+                    onChange={(e) => setCopies(Math.max(1, Number(e.target.value)))}
+                    required
+                    className="w-full bg-[#0C1519] border border-white/8 text-white text-sm font-black
+                      placeholder:text-white/20 focus:outline-none focus:border-[#3BBCD9]/50
+                      transition-all duration-300 py-4 pr-4 pl-11 tracking-widest"
+                    style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#3BBCD9]/0 group-focus-within:bg-[#3BBCD9]/50 transition-all duration-300" />
+                </div>
               </div>
 
-              <div className="up-divider" />
+              {/* ── Error ── */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8"
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
+                  <span className="text-[#D91828] text-xs font-bold">{error}</span>
+                </motion.div>
+              )}
 
-              {/* Submit */}
-              <button type="submit" className="up-btn">
-                🔒 &nbsp; Generate Secure Token
-              </button>
-            </form>
+              {/* ── Submit ── */}
+              <motion.button
+                type="submit"
+                disabled={loading}
+                whileHover={{ scale: loading ? 1 : 1.02 }}
+                whileTap={{ scale: loading ? 1 : 0.97 }}
+                className="relative overflow-hidden group w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
+                  clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+                }}
+              >
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                      />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Submit <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
+                </span>
+              </motion.button>
 
-            {/* Footer note */}
-            <div className="up-footer">
-              <div className="up-footer-dot" />
-              END-TO-END ENCRYPTED · ZERO RETENTION POLICY
             </div>
           </div>
-        </div>
-      </div>
-    </>
+        </form>
+      </motion.div>
+
+      {/* Floating status indicator */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 1 }}
+        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#3BBCD9]/20 bg-[#0C1519]/90 backdrop-blur-md"
+        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
+      >
+        <span className="text-[10px] font-black text-[#3BBCD9] uppercase tracking-[0.35em]">
+          System Live
+        </span>
+        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
+      </motion.div>
+    </div>
   );
 }
