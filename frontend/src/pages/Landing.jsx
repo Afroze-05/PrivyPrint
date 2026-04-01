@@ -80,7 +80,7 @@ const FeatureCard = ({ icon, title, text, index }) => (
       rotateY: 5,
       transition: { duration: 0.3, type: "spring", stiffness: 400 }
     }}
-    className="group relative bg-orange-50 p-8 border border-orange-200 hover:border-orange-400 transition-all duration-500 overflow-hidden"
+    className="group relative bg-orange-50 p-4 border border-orange-200 hover:border-orange-400 transition-all duration-500 overflow-hidden"
     style={{ 
       clipPath: "polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)",
       transformStyle: "preserve-3d",
