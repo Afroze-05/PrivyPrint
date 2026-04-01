@@ -16,7 +16,6 @@ export default function VerifyOtp() {
 
   // If no email is provided, redirect back to signup
   if (!email) {
-    alert("Session expired. Please signup again.");
     navigate("/signup");
     return null;
   }
@@ -30,11 +29,10 @@ export default function VerifyOtp() {
     // Only allow single digit (0-9)
     if (!/^[0-9]?$/.test(value)) return;
     
-    const newOtp = otp.split("");
+    const newOtp = otp.split(" \);
     newOtp[index] = value;
-    const otpString = newOtp.join("");
-    setOtp(otpString);
-    console.log("OTP updated:", otpString); // Debug OTP update
+    setOtp(newOtp);
+    console.log("OTP updated:", newOtp); // Debug OTP update
 
     // Auto-focus next input
     if (value && index < 5) {
@@ -52,7 +50,7 @@ export default function VerifyOtp() {
   const handlePaste = (e) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    const newOtp = pastedData.padEnd(6, "");
+    const newOtp = pastedData.split("").concat(Array(6 - pastedData.length).fill(""));
     setOtp(newOtp);
     
     // Focus the next empty input or the last one
@@ -61,10 +59,12 @@ export default function VerifyOtp() {
     inputRefs.current[focusIndex]?.focus();
   };
 
-  const handleVerify = async () => {
+  const handleVerify = async (e) => {
+    e.preventDefault();
     console.log("Verify button clicked!"); // Debug log
+    const otpString = otp.join("");
     
-    if (otp.length !== 6) {
+    if (otpString.length !== 6) {
       setError("OTP must be exactly 6 digits");
       return;
     }
@@ -73,34 +73,28 @@ export default function VerifyOtp() {
     setLoading(true);
     
     try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email,
-          otp: otp
-        }),
+      const res = await api.post("/auth/verify-otp", {
+        email,
+        otp: otpString,
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        alert("OTP Verified Successfully");
-        navigate("/upload");
-      } else {
-        alert(data.message || "Invalid OTP");
+      if (res.status === 200) {
+        setSuccess(true);
+        
+        // Redirect to upload page after successful verification
+        setTimeout(() => {
+          navigate("/upload");
+        }, 1500);
       }
     } catch (err) {
-      console.error(err);
-      alert("Server error");
+      setError(err.response?.data?.message || "Invalid OTP");
     } finally {
       setLoading(false);
     }
   };
 
-  console.log("OTP state:", otp, "length:", otp.length); // Debug OTP state
+  const isComplete = otp.every(digit => digit !== "");
+  console.log("OTP state:", otp, "isComplete:", isComplete); // Debug OTP state
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
@@ -225,7 +219,7 @@ export default function VerifyOtp() {
                 </div>
 
                 {/* OTP Input */}
-                <div className="space-y-6 relative z-30">
+                <form onSubmit={handleVerify} className="space-y-6 relative z-30">
                   <div className="flex justify-center gap-3 mb-8">
                     {[...Array(6)].map((_, index) => (
                       <motion.div
@@ -267,16 +261,11 @@ export default function VerifyOtp() {
 
                   {/* Verify Button */}
                   <motion.button
-                    type="button"
-                    disabled={loading || otp.length !== 6}
-                    whileHover={{ scale: loading || otp.length !== 6 ? 1 : 1.02 }}
-                    whileTap={{ scale: loading || otp.length !== 6 ? 1 : 0.98 }}
-                    onClick={handleVerify}
-                    className={`w-full py-4 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 relative overflow-hidden group z-20 cursor-pointer pointer-events-auto ${
-                      otp.length === 6 && !loading
-                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 ring-2 ring-orange-500/50 ring-offset-0 ring-offset-transparent'
-                        : 'bg-gray-600 opacity-50 cursor-not-allowed'
-                    }`}
+                    type="submit"
+                    disabled={loading || !isComplete}
+                    whileHover={{ scale: loading || !isComplete ? 1 : 1.02 }}
+                    whileTap={{ scale: loading || !isComplete ? 1 : 0.98 }}
+                    className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group z-20"
                     style={{ fontFamily: '"Inter Tight", sans-serif' }}
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
@@ -298,7 +287,7 @@ export default function VerifyOtp() {
                       )}
                     </span>
                   </motion.button>
-                </div>
+                </form>
               </>
             )}
           </div>
