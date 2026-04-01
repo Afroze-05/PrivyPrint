@@ -335,7 +335,7 @@ export default function AdminPrintPanel() {
     if (!currentAuth?.token) { navigate("/admin/login"); return; }
     setLoadingDoc(true);
     try {
-      const res = await fetch("/api/verify-token", {
+      const res = await fetch("http://localhost:5000/api/verify-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

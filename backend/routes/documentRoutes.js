@@ -30,9 +30,6 @@ router.post("/test-verify", (req, res) => {
   res.json({ message: "Test route works" });
 });
 
-// Verify token for admin print panel (admin only).
-router.post("/verify-token", authMiddleware, requireRole("admin"), documentController.verifyToken);
-
 console.log("🔧 /verify-token route registered");
 
 // Verify token and fetch document details (admin only).
