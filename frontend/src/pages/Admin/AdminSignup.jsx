@@ -2,7 +2,16 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
 import { motion } from "framer-motion";
-import { User, Mail, Lock, ShieldCheck, ArrowRight, AlertTriangle, UserPlus } from "lucide-react";
+console.log(motion);
+import {
+  User,
+  Mail,
+  Lock,
+  ShieldCheck,
+  ArrowRight,
+  AlertTriangle,
+  UserPlus,
+} from "lucide-react";
 
 export default function AdminSignup() {
   const navigate = useNavigate();
@@ -13,13 +22,21 @@ export default function AdminSignup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Inside AdminSignup.js
   async function handleCreateAccount(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
-      navigate("/admin/login");
+
+      // IMPORTANT: Pass both email AND role to the OTP page
+      navigate("/verify-otp", {
+        state: {
+          email: email,
+          role: "admin", // <--- Add this
+        },
+      });
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Signup failed.");
     } finally {
@@ -39,9 +56,8 @@ export default function AdminSignup() {
 
       <div className="relative z-10 w-full max-w-6xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 items-center min-h-[90vh]">
-          
           {/* LEFT SIDE - ADMIN BRANDING */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
@@ -56,7 +72,9 @@ export default function AdminSignup() {
                 className="flex items-center gap-3 px-4 py-2 border border-red-500/30 bg-red-500/5 rounded-full w-fit"
               >
                 <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Admin Creation</span>
+                <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">
+                  Admin Creation
+                </span>
               </motion.div>
 
               {/* Logo/Icon */}
@@ -80,7 +98,7 @@ export default function AdminSignup() {
                 >
                   Create Admin
                 </motion.h1>
-                
+
                 <motion.h2
                   initial={{ y: 30, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
@@ -100,7 +118,8 @@ export default function AdminSignup() {
                 className="text-lg text-white/50 leading-relaxed max-w-md"
                 style={{ fontFamily: '"Inter", sans-serif' }}
               >
-                Create a privileged administrator account with full system access and management capabilities.
+                Create a privileged administrator account with full system
+                access and management capabilities.
               </motion.p>
 
               {/* Security Features */}
@@ -127,7 +146,7 @@ export default function AdminSignup() {
           </motion.div>
 
           {/* RIGHT SIDE - ADMIN FORM */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
@@ -141,20 +160,21 @@ export default function AdminSignup() {
                 transition={{ delay: 0.2, duration: 0.8 }}
                 className="relative"
                 style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: '24px',
-                  boxShadow: '0 25px 70px rgba(0,0,0,0.9), 0 0 50px rgba(239,68,68,0.2)'
+                  background: "rgba(255,255,255,0.03)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  borderRadius: "24px",
+                  boxShadow:
+                    "0 25px 70px rgba(0,0,0,0.9), 0 0 50px rgba(239,68,68,0.2)",
                 }}
               >
                 {/* Stronger Glow Effect */}
                 <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-red-600/15 to-orange-600/10" />
-                
+
                 {/* Admin Creation Bar */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 rounded-t-3xl" />
-                
+
                 <div className="relative p-8 lg:p-10">
                   {/* Header */}
                   <div className="text-center mb-8">
@@ -166,7 +186,7 @@ export default function AdminSignup() {
                     >
                       <UserPlus size={32} className="text-white" />
                     </motion.div>
-                    
+
                     <motion.h2
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -176,7 +196,7 @@ export default function AdminSignup() {
                     >
                       Admin Registration
                     </motion.h2>
-                    
+
                     <motion.p
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -184,7 +204,8 @@ export default function AdminSignup() {
                       className="text-white/50 text-sm"
                       style={{ fontFamily: '"Inter", sans-serif' }}
                     >
-                      Create a new administrator account with elevated privileges
+                      Create a new administrator account with elevated
+                      privileges
                     </motion.p>
                   </div>
 
@@ -197,8 +218,12 @@ export default function AdminSignup() {
                   >
                     <AlertTriangle className="w-5 h-5 text-red-400" />
                     <div>
-                      <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">Privileged Account</p>
-                      <p className="text-xs text-white/40">This account will have admin access</p>
+                      <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">
+                        Privileged Account
+                      </p>
+                      <p className="text-xs text-white/40">
+                        This account will have admin access
+                      </p>
                     </div>
                   </motion.div>
 
@@ -211,13 +236,16 @@ export default function AdminSignup() {
                       transition={{ delay: 0.7, duration: 0.6 }}
                       className="relative"
                     >
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20} />
+                      <User
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                        size={20}
+                      />
                       <input
                         type="text"
                         placeholder="Full name"
                         className="w-full pl-12 pr-4 py-4 bg-white/3 border border-white/8 text-white placeholder-white/30 rounded-xl focus:outline-none focus:border-red-500 focus:shadow-lg focus:shadow-red-500/25 transition-all duration-300"
                         style={{
-                          fontFamily: '"Inter", sans-serif'
+                          fontFamily: '"Inter", sans-serif',
                         }}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
@@ -232,13 +260,16 @@ export default function AdminSignup() {
                       transition={{ delay: 0.8, duration: 0.6 }}
                       className="relative"
                     >
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20} />
+                      <Mail
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                        size={20}
+                      />
                       <input
                         type="email"
                         placeholder="admin@example.com"
                         className="w-full pl-12 pr-4 py-4 bg-white/3 border border-white/8 text-white placeholder-white/30 rounded-xl focus:outline-none focus:border-red-500 focus:shadow-lg focus:shadow-red-500/25 transition-all duration-300"
                         style={{
-                          fontFamily: '"Inter", sans-serif'
+                          fontFamily: '"Inter", sans-serif',
                         }}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -253,13 +284,16 @@ export default function AdminSignup() {
                       transition={{ delay: 0.9, duration: 0.6 }}
                       className="relative"
                     >
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20} />
+                      <Lock
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                        size={20}
+                      />
                       <input
                         type="password"
                         placeholder="Create strong password"
                         className="w-full pl-12 pr-4 py-4 bg-white/3 border border-white/8 text-white placeholder-white/30 rounded-xl focus:outline-none focus:border-red-500 focus:shadow-lg focus:shadow-red-500/25 transition-all duration-300"
                         style={{
-                          fontFamily: '"Inter", sans-serif'
+                          fontFamily: '"Inter", sans-serif',
                         }}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -286,7 +320,10 @@ export default function AdminSignup() {
                       transition={{ delay: 1.0, duration: 0.6 }}
                       type="submit"
                       disabled={loading}
-                      whileHover={{ scale: loading ? 1 : 1.02, y: loading ? 0 : -2 }}
+                      whileHover={{
+                        scale: loading ? 1 : 1.02,
+                        y: loading ? 0 : -2,
+                      }}
                       whileTap={{ scale: loading ? 1 : 0.98 }}
                       className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-xl shadow-lg shadow-red-600/30 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
                       style={{ fontFamily: '"Inter Tight", sans-serif' }}
@@ -297,7 +334,11 @@ export default function AdminSignup() {
                           <>
                             <motion.div
                               animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: "linear",
+                              }}
                               className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                             />
                             Creating Admin...
@@ -319,7 +360,10 @@ export default function AdminSignup() {
                     transition={{ delay: 1.1, duration: 0.6 }}
                     className="text-center mt-8"
                   >
-                    <p className="text-white/40 text-sm" style={{ fontFamily: '"Inter", sans-serif' }}>
+                    <p
+                      className="text-white/40 text-sm"
+                      style={{ fontFamily: '"Inter", sans-serif' }}
+                    >
                       Already have admin credentials?{" "}
                       <Link
                         to="/admin/login"

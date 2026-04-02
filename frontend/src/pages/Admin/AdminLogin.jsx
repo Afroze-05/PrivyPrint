@@ -2,9 +2,18 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
 import { setAuth } from "../../services/authStorage";
-import { motion } from "framer-motion";
-import { Mail, Lock, ShieldCheck, ArrowRight, AlertTriangle, Eye, EyeOff } from "lucide-react";
 
+import { motion } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  ShieldCheck,
+  ArrowRight,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+console.log(motion, api, setAuth);
 export default function AdminLogin() {
   const navigate = useNavigate();
 
@@ -37,25 +46,28 @@ export default function AdminLogin() {
   }
 
   return (
-    <div 
+    <div
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
-        fontFamily: '"Inter", sans-serif'
+        background:
+          "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+        fontFamily: '"Inter", sans-serif',
       }}
     >
       {/* Background Elements */}
       <div className="absolute inset-0">
-        <div 
+        <div
           className="absolute inset-0 opacity-30"
           style={{
-            background: "radial-gradient(circle at 25% 25%, rgba(255, 107, 53, 0.1) 0%, transparent 50%)",
+            background:
+              "radial-gradient(circle at 25% 25%, rgba(255, 107, 53, 0.1) 0%, transparent 50%)",
           }}
         />
-        <div 
+        <div
           className="absolute inset-0 opacity-30"
           style={{
-            background: "radial-gradient(circle at 75% 75%, rgba(255, 138, 80, 0.08) 0%, transparent 50%)",
+            background:
+              "radial-gradient(circle at 75% 75%, rgba(255, 138, 80, 0.08) 0%, transparent 50%)",
           }}
         />
       </div>
@@ -77,7 +89,7 @@ export default function AdminLogin() {
             background: "rgba(255,255,255,0.03)",
             backdropFilter: "blur(16px)",
             border: "1px solid rgba(255,255,255,0.08)",
-            color: "#FF6B35"
+            color: "#FF6B35",
           }}
         >
           <ShieldCheck className="w-4 h-4" />
@@ -91,7 +103,8 @@ export default function AdminLogin() {
             background: "rgba(255,255,255,0.03)",
             backdropFilter: "blur(16px)",
             border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)",
           }}
         >
           {/* Title */}
@@ -104,7 +117,7 @@ export default function AdminLogin() {
               fontFamily: '"Clash Display", "Inter", sans-serif',
               color: "#EAEAEA",
               fontWeight: 700,
-              lineHeight: 1.1
+              lineHeight: 1.1,
             }}
           >
             Admin{" "}
@@ -113,7 +126,7 @@ export default function AdminLogin() {
                 background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
-                backgroundClip: "text"
+                backgroundClip: "text",
               }}
             >
               Portal
@@ -127,7 +140,7 @@ export default function AdminLogin() {
             className="text-sm mb-8"
             style={{
               color: "#999999",
-              lineHeight: 1.6
+              lineHeight: 1.6,
             }}
           >
             Enter your credentials to access the admin dashboard
@@ -140,7 +153,9 @@ export default function AdminLogin() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5, duration: 0.6 }}
             >
-              <label className="block text-sm font-medium text-white mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-white mb-2">
+                Email Address
+              </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                   <Mail className="w-4 h-4 text-gray-400" />
@@ -155,7 +170,7 @@ export default function AdminLogin() {
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.08)",
                     color: "#EAEAEA",
-                    fontFamily: '"Inter", sans-serif'
+                    fontFamily: '"Inter", sans-serif',
                   }}
                   placeholder="admin@example.com"
                 />
@@ -168,7 +183,9 @@ export default function AdminLogin() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6, duration: 0.6 }}
             >
-              <label className="block text-sm font-medium text-white mb-2">Password</label>
+              <label className="block text-sm font-medium text-white mb-2">
+                Password
+              </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                   <Lock className="w-4 h-4 text-gray-400" />
@@ -183,7 +200,7 @@ export default function AdminLogin() {
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.08)",
                     color: "#EAEAEA",
-                    fontFamily: '"Inter", sans-serif'
+                    fontFamily: '"Inter", sans-serif',
                   }}
                   placeholder="Enter your password"
                 />
@@ -192,7 +209,11 @@ export default function AdminLogin() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -205,7 +226,7 @@ export default function AdminLogin() {
                 className="p-4 rounded-xl border flex items-center gap-3"
                 style={{
                   background: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.2)"
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
                 }}
               >
                 <AlertTriangle className="w-4 h-4 text-red-400" />
@@ -222,14 +243,18 @@ export default function AdminLogin() {
               className="relative w-full py-4 rounded-xl font-semibold text-white overflow-hidden transition-all duration-300 disabled:opacity-50"
               style={{
                 background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
-                fontFamily: '"Clash Display", "Inter", sans-serif'
+                fontFamily: '"Clash Display", "Inter", sans-serif',
               }}
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-3">
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                   />
                   <span>Authenticating...</span>
