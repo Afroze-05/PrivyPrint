@@ -13,8 +13,12 @@ async function generateUniqueDocumentToken() {
   // Try a handful of times to avoid collisions.
   for (let attempt = 0; attempt < 10; attempt++) {
     const token = generateToken();
+    console.log(` Token generation attempt ${attempt + 1}: ${token}`);
     const exists = await Document.exists({ token });
-    if (!exists) return token;
+    if (!exists) {
+      console.log(` Unique token generated: ${token}`);
+      return token;
+    }
   }
   throw new Error("Failed to generate a unique token. Please try again.");
 }
@@ -31,27 +35,43 @@ async function markExpiredIfNeeded(doc) {
 }
 
 async function getDocumentForVerification(token) {
+  console.log(`🔍 Document verification - Looking for token: ${token}`);
   const doc = await Document.findOne({ token }).populate("userId", "email name role");
-  if (!doc) return { ok: false, statusCode: 404, message: "Token not found." };
+  if (!doc) {
+    console.log(`❌ Document verification - Token not found: ${token}`);
+    return { ok: false, statusCode: 404, message: "Token not found." };
+  }
 
   await markExpiredIfNeeded(doc);
 
   if (doc.status === "expired") {
+    console.log(`❌ Document verification - Token expired: ${token}`);
     return { ok: false, statusCode: 410, message: "Token expired." };
   }
 
   if (doc.status === "completed") {
+    console.log(`❌ Document verification - Token already used: ${token}`);
     return { ok: false, statusCode: 409, message: "Token already used." };
   }
 
+  console.log(`✅ Document verification - Token valid: ${token}, status: ${doc.status}`);
   return { ok: true, document: doc };
 }
 
 async function uploadDocument(req, res) {
   try {
+    console.log('🔍 Upload Debug - Upload request received');
+    console.log('🔍 Upload Debug - User authenticated:', !!req.user);
+    console.log('🔍 Upload Debug - User ID:', req.user?.id);
+    console.log('🔍 Upload Debug - User role:', req.user?.role);
+    console.log('🔍 Upload Debug - File received:', !!req.file);
+    console.log('🔍 Upload Debug - File details:', req.file?.originalname, req.file?.mimetype, req.file?.size);
+    
     const { type, copies } = req.body;
+    console.log('🔍 Upload Debug - Request body - type:', type, 'copies:', copies);
 
     if (!req.file) {
+      console.log('❌ Upload Debug - Missing file upload');
       return res.status(400).json({ message: "Missing file upload. Use field name `file`." });
     }
 
@@ -59,12 +79,14 @@ async function uploadDocument(req, res) {
       DOCUMENT_TYPE_NORMALIZATION[(type || "").toLowerCase().trim()] || type;
 
     if (!["B/W", "Color"].includes(normalizedType)) {
+      console.log('❌ Upload Debug - Invalid type:', normalizedType);
       return res.status(400).json({ message: "type must be 'B/W' or 'Color'." });
     }
 
     const parsedCopies = copies ? Number(copies) : 1;
 
     if (!Number.isFinite(parsedCopies) || parsedCopies < 1) {
+      console.log('❌ Upload Debug - Invalid copies:', parsedCopies);
       return res.status(400).json({ message: "copies must be a positive number." });
     }
 
@@ -85,12 +107,17 @@ async function uploadDocument(req, res) {
       userId: req.user.id,
     });
 
-    return res.status(201).json({
+    console.log(`📄 Document created with token: ${doc.token}`);
+    const response = {
       token: doc.token,
       status: doc.status,
       expiresAt: doc.expiresAt,
-    });
+    };
+    console.log('📤 Upload response:', response);
+
+    return res.status(201).json(response);
   } catch (err) {
+    console.log('❌ Upload Debug - Upload failed:', err.message);
     return res.status(500).json({ message: "Upload failed.", error: err.message });
   }
 }
@@ -172,6 +199,8 @@ async function simulatePrint(req, res) {
     }
 
     await Log.create({ token, adminId, time: new Date() });
+    
+    console.log(`✅ Print completed - Token ${token} marked as used`);
 
     return res.status(200).json({
       message: "Printing completed.",
@@ -183,4 +212,159 @@ async function simulatePrint(req, res) {
   }
 }
 
-module.exports = { uploadDocument, getDocumentByToken, simulatePrint };
+// Get all documents with timestamps
+async function getAllDocuments(req, res) {
+  try {
+    const documents = await Document.find({})
+      .select('token fileUrl type status createdAt expiresAt userId')
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Transform to match frontend expectations
+    const transformedDocs = documents.map(doc => {
+      // Extract filename from fileUrl
+      const filename = doc.fileUrl ? doc.fileUrl.split('/').pop() : 'unknown';
+      
+      return {
+        id: doc._id,
+        token: doc.token,
+        filename: filename,
+        type: doc.type,
+        status: doc.status,
+        createdAt: doc.createdAt,
+        expiresAt: doc.expiresAt,
+        userId: doc.userId
+      };
+    });
+    
+    return res.status(200).json(transformedDocs);
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to fetch documents.", error: err.message });
+  }
+}
+
+// Get all tokens with status
+async function getAllTokens(req, res) {
+  try {
+    const tokens = await Document.find({})
+      .select('token status createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    return res.status(200).json(tokens);
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to fetch tokens.", error: err.message });
+  }
+}
+
+// Get recent activity
+async function getRecentActivity(req, res) {
+  try {
+    // Get recent logs (prints)
+    const printLogs = await Log.find({})
+      .select('token adminId time')
+      .sort({ time: -1 })
+      .limit(10)
+      .lean();
+    
+    // Get recent document uploads
+    const recentUploads = await Document.find({})
+      .select('token type createdAt userId')
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
+    // Transform and combine activities
+    const activities = [];
+    
+    // Add print activities
+    printLogs.forEach(log => {
+      activities.push({
+        type: 'print',
+        message: `Document printed (token: ${log.token})`,
+        timestamp: log.time,
+        adminId: log.adminId
+      });
+    });
+    
+    // Add upload activities
+    recentUploads.forEach(doc => {
+      activities.push({
+        type: 'upload',
+        message: `${doc.userId?.name || 'Unknown user'} uploaded ${doc.type} document`,
+        timestamp: doc.createdAt,
+        userId: doc.userId
+      });
+    });
+    
+    // Sort all activities by timestamp (most recent first)
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Return only the latest 10 activities
+    return res.status(200).json(activities.slice(0, 10));
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to fetch activity.", error: err.message });
+  }
+}
+
+async function verifyToken(req, res) {
+  console.log('🔧 verifyToken function called');
+  try {
+    const { token } = req.body;
+    console.log(`🔍 Token verification request - Token: ${token}`);
+    
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    const result = await getDocumentForVerification(token);
+
+    if (!result.ok) {
+      console.log(`❌ Token verification failed: ${result.message}`);
+      return res.status(result.statusCode).json({ message: result.message });
+    }
+
+    const doc = result.document;
+    
+    // ⏱️ CHECK 2 MINUTE EXPIRY (additional safety check)
+    const now = new Date();
+    const diff = (now - new Date(doc.createdAt)) / 1000; // seconds
+    
+    if (diff > 120) {
+      console.log(`❌ Token verification - Token expired after 2 minutes: ${token}`);
+      // Update document status to expired
+      await Document.updateOne(
+        { token },
+        { $set: { status: "expired" } }
+      );
+      return res.status(403).json({ message: "Token Expired" });
+    }
+
+    console.log(`✅ Token verification - Valid token: ${token}`);
+    return res.status(200).json({
+      message: "Token Valid",
+      file: doc.fileUrl,
+      token: doc.token,
+      type: doc.type,
+      copies: doc.copies,
+      status: doc.status,
+      createdAt: doc.createdAt,
+      expiresAt: doc.expiresAt
+    });
+  } catch (err) {
+    console.error('❌ Token verification error:', err);
+    return res.status(500).json({ message: "Token verification failed", error: err.message });
+  }
+}
+
+module.exports = {
+  uploadDocument,
+  getDocumentByToken,
+  verifyToken,
+  simulatePrint,
+  getAllDocuments,
+  getAllTokens,
+  getRecentActivity
+};
