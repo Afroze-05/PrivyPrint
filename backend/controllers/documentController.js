@@ -60,9 +60,18 @@ async function getDocumentForVerification(token) {
 
 async function uploadDocument(req, res) {
   try {
+    console.log('🔍 Upload Debug - Upload request received');
+    console.log('🔍 Upload Debug - User authenticated:', !!req.user);
+    console.log('🔍 Upload Debug - User ID:', req.user?.id);
+    console.log('🔍 Upload Debug - User role:', req.user?.role);
+    console.log('🔍 Upload Debug - File received:', !!req.file);
+    console.log('🔍 Upload Debug - File details:', req.file?.originalname, req.file?.mimetype, req.file?.size);
+    
     const { type, copies } = req.body;
+    console.log('🔍 Upload Debug - Request body - type:', type, 'copies:', copies);
 
     if (!req.file) {
+      console.log('❌ Upload Debug - Missing file upload');
       return res.status(400).json({ message: "Missing file upload. Use field name `file`." });
     }
 
@@ -70,12 +79,14 @@ async function uploadDocument(req, res) {
       DOCUMENT_TYPE_NORMALIZATION[(type || "").toLowerCase().trim()] || type;
 
     if (!["B/W", "Color"].includes(normalizedType)) {
+      console.log('❌ Upload Debug - Invalid type:', normalizedType);
       return res.status(400).json({ message: "type must be 'B/W' or 'Color'." });
     }
 
     const parsedCopies = copies ? Number(copies) : 1;
 
     if (!Number.isFinite(parsedCopies) || parsedCopies < 1) {
+      console.log('❌ Upload Debug - Invalid copies:', parsedCopies);
       return res.status(400).json({ message: "copies must be a positive number." });
     }
 
@@ -106,6 +117,7 @@ async function uploadDocument(req, res) {
 
     return res.status(201).json(response);
   } catch (err) {
+    console.log('❌ Upload Debug - Upload failed:', err.message);
     return res.status(500).json({ message: "Upload failed.", error: err.message });
   }
 }

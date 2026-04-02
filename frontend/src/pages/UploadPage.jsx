@@ -108,16 +108,17 @@ export default function UploadPage() {
       if (!auth?.token) throw new Error("Missing authentication token.");
       if (!file) throw new Error("Please select a PDF or image file.");
 
+      console.log('🔍 Upload Debug - Token exists:', !!auth?.token);
+      console.log('🔍 Upload Debug - Token length:', auth?.token?.length);
+      console.log('🔍 Upload Debug - User role:', auth?.role);
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("type", type);
       formData.append("copies", String(copies));
 
       const res = await api.post("/upload", formData, {
-        headers: {
-          ...authHeader(auth.token),
-          "Content-Type": "multipart/form-data",
-        },
+        headers: authHeader(auth.token),
       });
 
       clearInterval(progressInterval);
