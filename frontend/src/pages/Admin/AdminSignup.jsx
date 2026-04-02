@@ -31,7 +31,7 @@ export default function AdminSignup() {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
 
       // IMPORTANT: Pass both email AND role to the OTP page
-      navigate("/verify-otp", {
+      navigate("/admin/verify-otp", {
         state: {
           email: email,
           role: "admin", // <--- Add this

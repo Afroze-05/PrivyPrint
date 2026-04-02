@@ -228,9 +228,20 @@ async function verifyOTP(req, res) {
     user.otpExpires = undefined;
     await user.save();
 
+    // D. Generate JWT token for automatic login after verification
+    const token = signJWT(user);
+
     res.status(200).json({
       success: true,
-      message: "Verification successful!"
+      message: "Verification successful!",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        trustScore: user.trustScore,
+      }
     });
   } catch (err) {
     res

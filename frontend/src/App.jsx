@@ -10,6 +10,7 @@ import AdminLogin from "./pages/Admin/AdminLogin";
 import AdminSignup from "./pages/Admin/AdminSignup";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminPrintPanel from "./pages/Admin/AdminPrintPanel";
+import AdminVerifyOtp from "./pages/Admin/AdminVerifyOtp";
 import PrintLogsPage from "./pages/Admin/PrintLogsPage";
 import RequireAuth from "./components/RequireAuth";
 import VerifyOtp from "./pages/VerifyOtp"; // Added back
@@ -48,6 +49,7 @@ function App() {
           {/* Admin flow (merged with Afroze's dashboard routes) */}
           <Route path="/admin/signup" element={<AdminSignup />} />
           <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/verify-otp" element={<AdminVerifyOtp />} />
           <Route
             path="/admin/dashboard"
             element={
