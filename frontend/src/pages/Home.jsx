@@ -257,21 +257,21 @@ export default function Home() {
           </motion.div>
         </div>
 
-          {/* Bottom status */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.4 }}
-            className="flex items-center justify-center"
-          >
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#FF6B35]/15 bg-black/20 backdrop-blur-sm">
-              <div className="w-2 h-2 bg-[#FF6B35] rounded-full animate-pulse" />
-              <span className="text-xs font-medium text-[#AAAAAA]">
-                System Online
-              </span>
-            </div>
-          </motion.div>
-        </div>
+        {/* Bottom status */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8, duration: 0.4 }}
+          className="flex items-center justify-center"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#FF6B35]/15 bg-black/20 backdrop-blur-sm">
+            <div className="w-2 h-2 bg-[#FF6B35] rounded-full animate-pulse" />
+            <span className="text-xs font-medium text-[#AAAAAA]">
+              System Online
+            </span>
+          </div>
+        </motion.div>
       </div>
+    </div>
     );
   }
