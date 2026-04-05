@@ -27,8 +27,21 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Serve uploaded files with proper headers
+app.use("/uploads", (req, res, next) => {
+  // Set security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Cache control for static files
+  res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+  
+  next();
+}, express.static(path.join(__dirname, "uploads")));
 
 // Health check
 app.get("/", (_req, res) => {

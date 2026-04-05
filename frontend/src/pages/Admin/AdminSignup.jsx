@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
+import { setAuth, getAuth } from "../../services/authStorage";
 import { motion } from "framer-motion";
 console.log(motion);
 import {

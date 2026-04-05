@@ -343,16 +343,28 @@ async function verifyToken(req, res) {
     }
 
     console.log(`✅ Token verification - Valid token: ${token}`);
-    return res.status(200).json({
+    
+    // Enhanced response with file metadata
+    const response = {
       message: "Token Valid",
-      file: doc.fileUrl,
       token: doc.token,
+      file: doc.fileUrl,
       type: doc.type,
       copies: doc.copies,
       status: doc.status,
       createdAt: doc.createdAt,
-      expiresAt: doc.expiresAt
-    });
+      expiresAt: doc.expiresAt,
+      // Additional metadata for frontend
+      fileUrl: doc.fileUrl,
+      fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'unknown',
+      fileSize: doc.fileUrl ? null : null, // Could be enhanced to store file size
+      customerId: doc.userId?._id,
+      customerEmail: doc.userId?.email,
+      customerName: doc.userId?.name
+    };
+    
+    console.log('📤 Enhanced verify token response:', response);
+    return res.status(200).json(response);
   } catch (err) {
     console.error('❌ Token verification error:', err);
     return res.status(500).json({ message: "Token verification failed", error: err.message });
