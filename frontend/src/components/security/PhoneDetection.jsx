@@ -2,56 +2,220 @@ import { useEffect, useRef, useState } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { api } from '../../services/api';
+import { motion } from 'framer-motion';
+import { Smartphone, Shield, AlertTriangle } from 'lucide-react';
 
 // Security Alert Component
-const SecurityAlert = ({ isActive, message }) => {
+const SecurityAlert = ({ isActive, message, countdown, onGoBack, onRetry }) => {
   if (!isActive) return null;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
       style={{
         position: "fixed",
         top: 0,
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "#ef4444", // Red background
-        zIndex: 10000, // Above everything
+        backgroundColor: "#ffffff", // PURE WHITE background
+        zIndex: 10000,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "white",
+        color: "#dc2626", // RED ONLY text
         textAlign: "center",
         padding: "20px",
         userSelect: "none",
         pointerEvents: "all",
+        fontFamily: '"Inter", sans-serif'
       }}
     >
-      <div style={{ 
-        fontSize: "80px", 
-        marginBottom: "20px",
-        animation: "pulse 1s infinite"
-      }}>
-        📱
-      </div>
-      <h1 style={{ fontSize: "2.5rem", fontWeight: "900", margin: "0 0 16px" }}>
+      {/* Phone Icon with Animation */}
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0, rotate: 0 }}
+        animate={{ 
+          scale: [1, 1.05, 1], 
+          opacity: 1,
+          rotate: [0, 2, -2, 0] // Subtle shake on load
+        }}
+        transition={{ 
+          scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+          rotate: { duration: 0.5, ease: "easeOut" },
+          opacity: { duration: 0.5 }
+        }}
+        style={{ marginBottom: "32px" }}
+      >
+        <Smartphone 
+          size={64} 
+          style={{ 
+            color: "#dc2626",
+            filter: "drop-shadow(0 4px 8px rgba(220, 38, 38, 0.2))"
+          }} 
+        />
+      </motion.div>
+
+      {/* Main Alert Title */}
+      <motion.h1
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        style={{
+          fontSize: "3rem",
+          fontWeight: 900,
+          margin: "0 0 16px",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          fontFamily: '"Orbitron", "Rajdhani", "Space Grotesk", sans-serif',
+          color: "#dc2626"
+        }}
+      >
         PHONE DETECTED
-      </h1>
-      <p style={{ fontSize: "1.25rem", fontWeight: "600", maxWidth: "600px", opacity: 0.9 }}>
-        {message}
-      </p>
-      <div style={{ marginTop: 40, fontSize: "1.1rem", opacity: 0.9, fontWeight: 700 }}>
-        Returning to dashboard in a few seconds...
-      </div>
-      
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-      `}</style>
-    </div>
+      </motion.h1>
+
+      {/* Alert Message */}
+      <motion.p
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        style={{
+          fontSize: "1.5rem",
+          fontWeight: 700,
+          maxWidth: "600px",
+          marginBottom: "32px",
+          letterSpacing: "0.02em",
+          fontFamily: '"Inter", sans-serif',
+          color: "#dc2626"
+        }}
+      >
+        Mobile Camera Detected
+      </motion.p>
+
+      {/* Alert Box */}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        style={{
+          backgroundColor: "#ffffff",
+          border: "2px solid #dc2626",
+          borderRadius: "12px",
+          padding: "32px",
+          maxWidth: "500px",
+          width: "100%",
+          boxShadow: "0 8px 32px rgba(220, 38, 38, 0.1)",
+          marginBottom: "32px"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}>
+          <AlertTriangle size={24} style={{ color: "#dc2626", marginRight: "12px" }} />
+          <span 
+            style={{ 
+              fontSize: "1.1rem", 
+              fontWeight: 700,
+              fontFamily: '"Inter", sans-serif',
+              color: "#dc2626"
+            }}
+          >
+            Security Violation
+          </span>
+        </div>
+        
+        <p style={{
+          fontSize: "1rem",
+          fontWeight: 500,
+          lineHeight: 1.6,
+          margin: 0,
+          fontFamily: '"Inter", sans-serif',
+          color: "#dc2626"
+        }}>
+          {message}
+        </p>
+      </motion.div>
+
+      {/* Countdown */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0.8, 1, 0.8] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          fontSize: "1.1rem",
+          fontWeight: 700,
+          marginBottom: "32px",
+          fontFamily: '"Inter", sans-serif',
+          color: "#dc2626"
+        }}
+      >
+        Returning to safe screen in {countdown} second{countdown !== 1 ? 's' : ''}...
+      </motion.div>
+
+      {/* Action Buttons */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        style={{ display: "flex", gap: "16px" }}
+      >
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onGoBack}
+          style={{
+            padding: "12px 24px",
+            border: "2px solid #dc2626",
+            backgroundColor: "transparent",
+            color: "#dc2626",
+            borderRadius: "8px",
+            fontSize: "1rem",
+            fontWeight: 600,
+            fontFamily: '"Inter", sans-serif',
+            cursor: "pointer",
+            transition: "all 0.3s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "#dc2626";
+            e.target.style.color = "#ffffff";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "transparent";
+            e.target.style.color = "#dc2626";
+          }}
+        >
+          Go Back
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onRetry}
+          style={{
+            padding: "12px 24px",
+            border: "2px solid #dc2626",
+            backgroundColor: "transparent",
+            color: "#dc2626",
+            borderRadius: "8px",
+            fontSize: "1rem",
+            fontWeight: 600,
+            fontFamily: '"Inter", sans-serif',
+            cursor: "pointer",
+            transition: "all 0.3s ease"
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "#dc2626";
+            e.target.style.color = "#ffffff";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "transparent";
+            e.target.style.color = "#dc2626";
+          }}
+        >
+          Retry
+        </motion.button>
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -65,7 +229,9 @@ export default function PhoneDetection({ existingVideoRef }) {
   const [useFallback, setUseFallback] = useState(false);
   const [showSecurityAlert, setShowSecurityAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const [countdown, setCountdown] = useState(5);
   const lastAlertTimeRef = useRef(0);
+  const countdownRef = useRef(null);
 
   // Load COCO-SSD model
   useEffect(() => {
@@ -251,6 +417,9 @@ export default function PhoneDetection({ existingVideoRef }) {
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
     };
   }, [isCameraActive, phoneDetected, existingVideoRef, useFallback]);
 
@@ -275,18 +444,47 @@ export default function PhoneDetection({ existingVideoRef }) {
     // Show security alert overlay
     setAlertMessage(message);
     setShowSecurityAlert(true);
+    setCountdown(5);
     
-    // Auto-dismiss after 4 seconds and navigate back to dashboard
+    // Start countdown
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    // Auto-dismiss after 5 seconds and navigate back to dashboard
     setTimeout(() => {
       setShowSecurityAlert(false);
       window.location.href = "/admin/dashboard";
-    }, 4000);
+    }, 5000);
+  };
+
+  const handleGoBack = () => {
+    setShowSecurityAlert(false);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    window.location.href = "/admin/dashboard";
+  };
+
+  const handleRetry = () => {
+    setShowSecurityAlert(false);
+    if (countdownRef.current) clearInterval(countdownRef.current);
   };
 
   return (
     <>
       {/* Security Alert Overlay */}
-      <SecurityAlert isActive={showSecurityAlert} message={alertMessage} />
+      <SecurityAlert 
+        isActive={showSecurityAlert} 
+        message={alertMessage}
+        countdown={countdown}
+        onGoBack={handleGoBack}
+        onRetry={handleRetry}
+      />
       
       {/* Hidden container for detection */}
       <div style={{ display: 'none' }}>
