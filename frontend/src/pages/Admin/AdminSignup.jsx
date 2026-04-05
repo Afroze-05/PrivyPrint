@@ -351,14 +351,11 @@ export default function AdminSignup() {
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
-
-      // IMPORTANT: Pass both email AND role to the OTP page
-      navigate("/admin/verify-otp", {
-        state: {
-          email: email,
-          role: "admin", // <--- Add this
-        },
+      navigate("/verify-otp", {
+        // ← Only this
+        state: { email, role: "admin" },
       });
+      // Then in your VerifyOTP component, navigate to /admin/dashboard on success
     } catch (err) {
       setError(err?.response?.data?.message || "REGISTRATION FAILED: AUTH_ERROR");
     } finally {

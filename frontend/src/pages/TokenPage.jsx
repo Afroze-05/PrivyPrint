@@ -18,7 +18,6 @@ const NoiseSVG = () => (
   </svg>
 );
 
-
 /* ── Dot-grid background ── */
 const GridDots = () => (
   <div

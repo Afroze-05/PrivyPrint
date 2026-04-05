@@ -1128,7 +1128,23 @@ export default function CustomerSignup() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const loginRes = await api.post("/auth/login", { email, password });
+      const { token, user } = loginRes.data;
+      setAuth({ token, ...user });
+      navigate("/upload");
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Login failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center overflow-hidden">

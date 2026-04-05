@@ -263,23 +263,25 @@ function Landing() {
         </motion.div>
       </div>
 
-      {/* NEW HERO SECTION (REPLACEMENT) */}
-<section className="relative min-h-screen flex items-center justify-center px-6" style={{ scrollSnapAlign: "start" }}>
-
-  {/* Top Left */}
-  <div className="absolute top-6 left-6 flex items-center gap-2">
-    <Cpu className="w-3 h-3 text-[var(--accent)]/40" />
-    <span className="text-[10px] tracking-[0.4em] text-[var(--text-muted)] uppercase">
-      PRIVYPRINT OS v4.2
-    </span>
-  </div>
-
-  {/* Top Right */}
-  <div className="absolute top-6 right-6 px-4 py-2 bg-black/40 border border-[var(--accent)]/20 text-xs tracking-widest text-[var(--accent)] uppercase">
-    SYSTEM LIVE
-  </div>
-
-  <div className="relative z-10 text-center">
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center px-6" style={{ scrollSnapAlign: "start" }}>
+        <div className="relative z-10 max-w-6xl mx-auto text-center">
+          {/* Status indicator */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="inline-flex items-center gap-3 mb-8 px-4 py-2 rounded-full"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "#FF6B35"
+            }}
+          >
+            <div className="w-2 h-2 rounded-full bg-[#FF6B35] animate-pulse" />
+            <span className="text-sm font-medium">System Active</span>
+          </motion.div>
 
     {/* Badge */}
     <div className="mb-6 px-6 py-2 border border-[var(--accent)]/20 inline-flex items-center gap-2">
