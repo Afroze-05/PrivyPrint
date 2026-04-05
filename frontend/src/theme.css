@@ -1,51 +1,53 @@
 /* PrivyPrint Professional Theme System - Orange, Black & Beige */
 
 :root {
-  /* Light Theme Colors */
-  --light-bg-primary: #FFFFFF;
-  --light-bg-secondary: #FFF8F0;
-  --light-bg-tertiary: #F5E6D3;
-  --light-text-primary: #1A1A1A;
-  --light-text-secondary: #333333;
-  --light-text-muted: #666666;
-  --light-border: #E8D5C4;
-  --light-border-subtle: #F5E6D3;
+  /* Light Theme Colors - Premium Enhanced */
+  --light-bg-primary: #0A0A0A;
+  --light-bg-secondary: #1A1A1A;
+  --light-bg-tertiary: #2A2A2A;
+  --light-text-primary: #FFFFFF;
+  --light-text-secondary: #F5F5F5;
+  --light-text-muted: #A0A0A0;
+  --light-border: #333333;
+  --light-border-subtle: #2A2A2A;
   --light-accent: #FF6B35;
-  --light-accent-hover: #E85A2B;
+  --light-accent-hover: #FF8A50;
   --light-accent-light: #FFE5D9;
+  --light-accent-glow: #FF8A50;
   --light-success: #2D7A2D;
   --light-warning: #D97706;
   --light-error: #DC2626;
-  --light-surface: #FFFFFF;
-  --light-surface-elevated: #FFF8F0;
-  --light-shadow: rgba(0, 0, 0, 0.1);
-  --light-card-bg: #FFFFFF;
-  --light-input-bg: #FFFFFF;
-  --light-button-primary: #FF6B35;
-  --light-button-secondary: #F5E6D3;
+  --light-surface: rgba(255, 255, 255, 0.05);
+  --light-surface-elevated: rgba(255, 255, 255, 0.08);
+  --light-shadow: rgba(0, 0, 0, 0.5);
+  --light-card-bg: rgba(255, 255, 255, 0.03);
+  --light-input-bg: rgba(255, 255, 255, 0.05);
+  --light-button-primary: linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%);
+  --light-button-secondary: rgba(255, 255, 255, 0.1);
 
-  /* Dark Theme Colors */
-  --dark-bg-primary: #1A1A1A;
-  --dark-bg-secondary: #2D2D2D;
-  --dark-bg-tertiary: #404040;
-  --dark-text-primary: #FFF8F0;
-  --dark-text-secondary: #F5E6D3;
-  --dark-text-muted: #E8D5C4;
-  --dark-border: #404040;
-  --dark-border-subtle: #4D4D4D;
+  /* Dark Theme */
+  --dark-bg-primary: #0A0A0A;
+  --dark-bg-secondary: #1A1A1A;
+  --dark-bg-tertiary: #2A2A2A;
+  --dark-text-primary: #FFFFFF;
+  --dark-text-secondary: #F5F5F5;
+  --dark-text-muted: #A0A0A0;
+  --dark-border: #333333;
+  --dark-border-subtle: #2A2A2A;
   --dark-accent: #FF6B35;
-  --dark-accent-hover: #FF8555;
+  --dark-accent-hover: #FF8A50;
   --dark-accent-light: #4D2D1A;
+  --dark-accent-glow: #FF8A50;
   --dark-success: #2D7A2D;
   --dark-warning: #D97706;
   --dark-error: #DC2626;
-  --dark-surface: #2D2D2D;
-  --dark-surface-elevated: #404040;
-  --dark-shadow: rgba(0, 0, 0, 0.3);
-  --dark-card-bg: #2D2D2D;
-  --dark-input-bg: #404040;
-  --dark-button-primary: #FF6B35;
-  --dark-button-secondary: #4D4D4D;
+  --dark-surface: rgba(255, 255, 255, 0.05);
+  --dark-surface-elevated: rgba(255, 255, 255, 0.08);
+  --dark-shadow: rgba(0, 0, 0, 0.5);
+  --dark-card-bg: rgba(255, 255, 255, 0.03);
+  --dark-input-bg: rgba(255, 255, 255, 0.05);
+  --dark-button-primary: linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%);
+  --dark-button-secondary: rgba(255, 255, 255, 0.1);
 
   /* Default to Light Theme */
   --bg-primary: var(--light-bg-primary);
@@ -59,6 +61,7 @@
   --accent: var(--light-accent);
   --accent-hover: var(--light-accent-hover);
   --accent-light: var(--light-accent-light);
+  --accent-glow: var(--light-accent-glow);
   --success: var(--light-success);
   --warning: var(--light-warning);
   --error: var(--light-error);
@@ -84,6 +87,7 @@
   --accent: var(--dark-accent);
   --accent-hover: var(--dark-accent-hover);
   --accent-light: var(--dark-accent-light);
+  --accent-glow: var(--dark-accent-glow);
   --success: var(--dark-success);
   --warning: var(--dark-warning);
   --error: var(--dark-error);

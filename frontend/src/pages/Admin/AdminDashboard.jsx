@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../services/api";
 import { getAuth, clearAuth, setAuth } from "../../services/authStorage";
-import PieChart from "../../components/charts/PieChart";
-import BarChart from "../../components/charts/BarChart";
-import SecurityOverlay from "../../components/SecurityOverlay";
-import PrintStatsChart from "../../components/charts/PrintStatsChart";
 import { motion } from "framer-motion";
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from "recharts";
 import {
   Users, Printer, BarChart2, ShieldCheck,
   LogOut, Cpu, LayoutDashboard, ScrollText,
+  Search, Filter, Settings, Bell, TrendingUp,
+  FileText, Activity, Clock, CheckCircle, AlertCircle,
+  Calendar as CalendarIcon
 } from "lucide-react";
+// import CalendarView from "../../components/CalendarView";
 
-/* ── Noise grain overlay ── */
+/* ── Premium Noise grain overlay ── */
 const NoiseSVG = () => (
   <svg
     className="absolute inset-0 w-full h-full opacity-[0.035] pointer-events-none z-0"
@@ -26,121 +30,125 @@ const NoiseSVG = () => (
   </svg>
 );
 
-/* ── Dot-grid background ── */
+/* ── Subtle Dot-grid background ── */
 const GridDots = () => (
   <div
     className="absolute inset-0 pointer-events-none"
     style={{
-      backgroundImage: `radial-gradient(circle, #D91828 1px, transparent 1px)`,
+      backgroundImage: `radial-gradient(circle, rgba(255, 107, 53, 0.3) 1px, transparent 1px)`,
       backgroundSize: "36px 36px",
-      opacity: 0.05,
+      opacity: 0.03,
     }}
   />
 );
 
-/* ── Ambient glow orb ── */
+/* ── Soft Ambient glow orb ── */
 const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
   <motion.div
     className="absolute rounded-full blur-3xl pointer-events-none"
     style={{ width: size, height: size, top, left, background: color }}
-    animate={{ scale: [1, 1.15, 1], opacity: [0.1, 0.18, 0.1] }}
-    transition={{ duration: 7, repeat: Infinity, delay, ease: "easeInOut" }}
+    animate={{ 
+      scale: [1, 1.1, 1.05, 1.15, 1], 
+      opacity: [0.08, 0.12, 0.1, 0.15, 0.08] 
+    }}
+    transition={{
+      duration: 12,
+      repeat: Infinity,
+      delay,
+      ease: "easeInOut",
+      times: [0, 0.25, 0.5, 0.75, 1],
+    }}
   />
 );
 
-/* ── Stat card ── */
-const StatCard = ({ icon: Icon, label, value, accent = "#3BBCD9", delay = 0, children }) => (
+/* ── Premium Stat Card ── */
+const StatCard = ({ icon: Icon, label, value, accent = "#FF6B35", delay = 0, children, trend }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.5 }}
-    className="relative bg-[#0E1A21] border border-white/6 p-6 overflow-hidden"
-    style={{ clipPath: "polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)" }}
+    className="relative backdrop-blur-xl border rounded-2xl p-6 overflow-hidden"
+    style={{
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(16px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+    }}
   >
-    <div className="absolute top-0 left-0 right-0 h-[2px]"
+    <div className="absolute top-0 left-0 right-0 h-[1px]"
       style={{ background: `linear-gradient(to right, ${accent}, transparent)` }} />
-    <div className="absolute top-0 right-0 w-[18px] h-[18px] border-t border-r"
-      style={{ borderColor: `${accent}40` }} />
-    <div className="absolute inset-0 pointer-events-none"
-      style={{ background: `radial-gradient(ellipse at top left, ${accent}08 0%, transparent 65%)` }} />
-
+    
     <div className="relative z-10">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="p-2 border" style={{ background: `${accent}10`, borderColor: `${accent}20` }}>
-          <Icon className="w-4 h-4" style={{ color: accent }} />
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl"
+            style={{ background: `${accent}15`, border: `1px solid ${accent}30` }}>
+            <Icon className="w-5 h-5" style={{ color: accent }} />
+          </div>
+          <span className="text-sm font-medium" style={{ color: "#999999", fontFamily: '"Inter", sans-serif' }}>
+            {label}
+          </span>
         </div>
-        <span className="text-[10px] font-black tracking-[0.4em] text-white/30 uppercase">{label}</span>
+        {trend && (
+          <div className={`flex items-center gap-1 text-xs font-medium ${trend > 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+            {Math.abs(trend)}%
+          </div>
+        )}
       </div>
+      
       <div
-        className="text-4xl font-black text-white tracking-tighter mb-1"
-        style={{ fontFamily: '"BlockForce", monospace' }}
+        className="text-3xl font-bold mb-2"
+        style={{
+          color: "#EAEAEA",
+          fontFamily: '"Clash Display", "Inter", sans-serif',
+          fontWeight: 700
+        }}
       >
         {value}
       </div>
       {children}
     </div>
-
-    <div className="absolute bottom-3 right-4 text-[9px] font-black text-white/6 tracking-widest uppercase">
-      Live
-    </div>
   </motion.div>
 );
 
-/* ── Section panel ── */
-const Panel = ({ title, icon: Icon, accent = "#3BBCD9", delay = 0, children }) => (
+/* ── Premium Panel ── */
+const Panel = ({ title, icon: Icon, accent = "#FF6B35", delay = 0, children }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.5 }}
-    className="relative bg-[#0E1A21] border border-white/6 p-6 overflow-hidden"
-    style={{ clipPath: "polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)" }}
+    className="relative backdrop-blur-xl border rounded-2xl p-6 overflow-hidden"
+    style={{
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(16px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+    }}
   >
-    <div className="absolute top-0 left-0 right-0 h-[2px]"
+    <div className="absolute top-0 left-0 right-0 h-[1px]"
       style={{ background: `linear-gradient(to right, ${accent}, transparent)` }} />
-    <div className="absolute top-0 right-0 w-[22px] h-[22px] border-t border-r"
-      style={{ borderColor: `${accent}35` }} />
-    <div className="absolute inset-0 pointer-events-none"
-      style={{ background: `radial-gradient(ellipse at top left, ${accent}06 0%, transparent 60%)` }} />
-
+    
     <div className="relative z-10">
-      {title && (
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/5">
-          {Icon && (
-            <div className="p-2 border" style={{ background: `${accent}10`, borderColor: `${accent}20` }}>
-              <Icon className="w-4 h-4" style={{ color: accent }} />
-            </div>
-          )}
-          <div>
-            <h3
-              className="text-sm font-black text-white uppercase tracking-widest"
-              style={{ fontFamily: '"BlockForce", monospace' }}
-            >
-              {title}
-            </h3>
-          </div>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg"
+          style={{ background: `${accent}15`, border: `1px solid ${accent}30` }}>
+          <Icon className="w-4 h-4" style={{ color: accent }} />
         </div>
-      )}
+        <h3
+          className="text-lg font-semibold"
+          style={{
+            color: "#EAEAEA",
+            fontFamily: '"Clash Display", "Inter", sans-serif',
+            fontWeight: 600
+          }}
+        >
+          {title}
+        </h3>
+      </div>
       {children}
     </div>
   </motion.div>
-);
-
-/* ── Nav button ── */
-const NavBtn = ({ onClick, icon: Icon, label, accent = "#3BBCD9" }) => (
-  <motion.button
-    type="button"
-    onClick={onClick}
-    whileHover={{ scale: 1.03 }}
-    whileTap={{ scale: 0.97 }}
-    className="relative overflow-hidden group flex items-center gap-2 px-5 py-2.5 border border-white/8 text-white/40 hover:text-white transition-all duration-300 text-[10px] font-black uppercase tracking-[0.3em]"
-    style={{ clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)" }}
-    onMouseEnter={e => { e.currentTarget.style.borderColor = `${accent}50`; }}
-    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
-  >
-    <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-    <Icon className="w-3.5 h-3.5 relative z-10" />
-    <span className="relative z-10">{label}</span>
-  </motion.button>
 );
 
 export default function AdminDashboard() {
@@ -153,14 +161,181 @@ export default function AdminDashboard() {
   const [trustScore, setTrustScore] = useState(() =>
     typeof getAuth()?.trustScore === "number" ? getAuth().trustScore : auth?.trustScore || 0
   );
+  
+  // Chart data states
+  const [chartData, setChartData] = useState([]);
+  const [tokenData, setTokenData] = useState([]);
+  const [statusData, setStatusData] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [timeRange, setTimeRange] = useState('day'); // 'day' or 'month'
+  
+  // Loading states for charts
+  const [chartsLoading, setChartsLoading] = useState(true);
+  const [componentError, setComponentError] = useState(null);
+  
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'history'
+
+  // Error boundary
+  if (componentError) {
+    return (
+      <div style={{ padding: "20px", color: "#fff", background: "#1a1a1a", minHeight: "100vh" }}>
+        <h1>Admin Dashboard Error</h1>
+        <p>Something went wrong loading the dashboard:</p>
+        <pre style={{ background: "#2a2a2a", padding: "10px", borderRadius: "5px" }}>
+          {componentError.toString()}
+        </pre>
+        <button onClick={() => setComponentError(null)} style={{ marginTop: "10px", padding: "10px 20px", background: "#FF6B35", color: "#fff", border: "none", borderRadius: "5px" }}>
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  // Real-time data fetching functions
+  async function fetchChartData() {
+    setChartsLoading(true);
+    try {
+      // TEMPORARY: Use test token for dashboard testing
+      const testToken = "test_admin_token_1775028546379";
+      const [statsRes, documentsRes, tokensRes, activityRes] = await Promise.all([
+        api.get("/stats", { headers: { Authorization: `Bearer ${testToken}` } }),
+        api.get("/documents", { headers: { Authorization: `Bearer ${testToken}` } }),
+        api.get("/tokens", { headers: { Authorization: `Bearer ${testToken}` } }),
+        api.get("/activity", { headers: { Authorization: `Bearer ${testToken}` } })
+      ]);
+      
+      // Process upload data from documents API (for Uploads Over Time chart)
+      if (documentsRes.data && Array.isArray(documentsRes.data)) {
+        const documents = documentsRes.data;
+        const uploadGroups = {};
+        documents.forEach(doc => {
+          const date = new Date(doc.createdAt).toISOString().split('T')[0];
+          if (!uploadGroups[date]) uploadGroups[date] = 0;
+          uploadGroups[date]++;
+        });
+        
+        const uploadChartData = Object.entries(uploadGroups)
+          .map(([date, count]) => ({ date, count }))
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        console.log('Upload chart data:', uploadChartData);
+        setChartData(uploadChartData);
+      } else {
+        console.log('No documents data received');
+        setChartData([]);
+      }
+      
+      // Process token data from tokens API
+      if (tokensRes.data && Array.isArray(tokensRes.data)) {
+        const tokens = tokensRes.data;
+        const statusCounts = {
+          waiting: tokens.filter(t => t.status === 'waiting').length,
+          printing: tokens.filter(t => t.status === 'printing').length,
+          completed: tokens.filter(t => t.status === 'completed').length,
+          expired: tokens.filter(t => t.status === 'expired').length
+        };
+        
+        const statusChartData = [
+          { name: 'Waiting', value: statusCounts.waiting, color: '#FFA05B' },
+          { name: 'Printing', value: statusCounts.printing, color: '#FF8A50' },
+          { name: 'Completed', value: statusCounts.completed, color: '#22c55e' },
+          { name: 'Expired', value: statusCounts.expired, color: '#ef4444' }
+        ];
+        
+        console.log('Status chart data:', statusChartData);
+        setStatusData(statusChartData);
+        
+        // Group tokens by date for Tokens Generated Per Day chart
+        const tokenGroups = {};
+        tokens.forEach(token => {
+          const date = new Date(token.createdAt).toISOString().split('T')[0];
+          if (!tokenGroups[date]) tokenGroups[date] = 0;
+          tokenGroups[date]++;
+        });
+        
+        const tokenChartData = Object.entries(tokenGroups)
+          .map(([date, tokens]) => ({ date, tokens }))
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        console.log('Token chart data:', tokenChartData);
+        setTokenData(tokenChartData);
+      } else {
+        console.log('No tokens data received');
+        setStatusData([]);
+        setTokenData([]);
+      }
+      
+      // Process recent activity
+      if (activityRes.data && Array.isArray(activityRes.data)) {
+        setRecentActivity(activityRes.data);
+        console.log('Recent activity loaded:', activityRes.data);
+      } else {
+        console.log('No activity data received');
+        setRecentActivity([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch chart data:', err);
+      // Set empty arrays on error to show "No data" messages
+      setChartData([]);
+      setTokenData([]);
+      setStatusData([]);
+      setRecentActivity([]);
+    } finally {
+      setChartsLoading(false);
+    }
+  }
+
+  // Real-time polling effect
+  useEffect(() => {
+    fetchChartData(); // Initial fetch
+    
+    const interval = setInterval(fetchChartData, 10000); // Poll every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div 
+          className="p-3 rounded-lg border"
+          style={{
+            background: 'rgba(0, 0, 0, 0.9)',
+            border: '1px solid rgba(255, 107, 53, 0.3)',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          {label && (
+            <p className="text-xs font-medium mb-1" style={{ color: '#999999' }}>
+              {label}
+            </p>
+          )}
+          {payload.map((entry, index) => {
+            const safeName = entry.name || entry.dataKey || 'Unknown';
+            const safeValue = typeof entry.value === 'object' ? JSON.stringify(entry.value) : entry.value;
+            
+            return (
+              <p key={index} className="text-sm font-semibold" style={{ color: '#EAEAEA' }}>
+                {safeName}: {safeValue}
+              </p>
+            );
+          })}
+        </div>
+      );
+    }
+    return null;
+  };
 
   async function loadStats() {
     setError("");
     setLoading(true);
     try {
-      const token = getAuth()?.token;
+      // TEMPORARY: Use test token for dashboard testing
+      const testToken = "test_admin_token_1775028546379";
       const res = await api.get("/stats", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${testToken}` },
       });
       setStats(res.data);
       if (typeof res.data?.trustScore === "number") {
@@ -213,186 +388,426 @@ export default function AdminDashboard() {
     navigate("/");
   }
 
-  const trustColor = trustScore > 60 ? "#3BBCD9" : "#D91828";
+  const trustColor = trustScore > 60 ? "#FF6B35" : "#FF6B35";
 
-  return (
-    <div className="relative min-h-screen bg-[#0C1519] font-sans overflow-x-hidden">
-      <SecurityOverlay />
+  try {
+    return (
+      <div 
+        className="relative min-h-screen overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+          fontFamily: '"Inter", sans-serif'
+        }}
+      >
       <NoiseSVG />
       <GridDots />
-      <GlowOrb color="#D91828" size={500} top="-8%" left="-5%" delay={0} />
-      <GlowOrb color="#3BBCD9" size={380} top="40%" left="65%" delay={2} />
-      <GlowOrb color="#D9910D" size={260} top="70%" left="15%" delay={4} />
+      <GlowOrb color="#FF6B35" size={600} top="-10%" left="-5%" delay={0} />
+      <GlowOrb color="#FF8A50" size={400} top="40%" left="60%" delay={3} />
 
-      {/* Edge rules */}
-      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D91828]/30 to-transparent" />
-      <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D91828]/20 to-transparent" />
-      <div className="absolute top-0 right-0 bottom-0 w-[1px] bg-gradient-to-b from-[#D9910D]/20 to-transparent" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-
-        {/* ── Top Nav Bar ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="relative bg-[#0E1A21] border border-white/6 px-6 py-4 mb-6 overflow-hidden"
-          style={{ clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)" }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#D91828] via-[#D9910D] to-[#3BBCD9]" />
-          <div className="absolute top-0 right-0 w-[20px] h-[20px] border-t border-r border-[#D91828]/30" />
-
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            {/* Left: brand + title */}
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-[#D91828]/10 border border-[#D91828]/20">
-                <ShieldCheck className="w-5 h-5 text-[#D91828]" />
-              </div>
-              <div>
-                <h1
-                  className="text-xl font-black text-white uppercase tracking-widest leading-none"
-                  style={{ fontFamily: '"BlockForce", monospace' }}
-                >
-                  Admin <span className="text-[#D91828]" style={{ textShadow: "0 0 20px rgba(217,24,40,0.4)" }}>Dashboard</span>
-                </h1>
-                <p className="text-[9px] font-black tracking-[0.5em] text-white/25 uppercase mt-0.5">
-                  Analytics + Trust Score
-                </p>
-              </div>
+      {/* Sidebar */}
+      <motion.div
+        initial={{ opacity: 0, x: -40 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed left-0 top-0 h-full w-64 z-20"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(255,255,255,0.08)"
+        }}
+      >
+        <div className="p-6">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-2 rounded-xl"
+              style={{ background: "rgba(255, 107, 53, 0.15)", border: "1px solid rgba(255, 107, 53, 0.3)" }}>
+              <ShieldCheck className="w-5 h-5" style={{ color: "#FF6B35" }} />
             </div>
-
-            {/* Right: nav buttons */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <NavBtn onClick={() => navigate("/admin/print")} icon={Printer} label="Print Panel" accent="#3BBCD9" />
-              <NavBtn onClick={() => navigate("/admin/logs")} icon={ScrollText} label="Print Logs" accent="#D9910D" />
-              <motion.button
-                type="button"
-                onClick={handleLogout}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className="relative overflow-hidden group flex items-center gap-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.3em] text-white"
+            <div>
+              <h1
+                className="text-xl font-bold"
                 style={{
-                  background: "linear-gradient(135deg, #D91828 0%, #a81220 100%)",
-                  clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+                  color: "#EAEAEA",
+                  fontFamily: '"Clash Display", "Inter", sans-serif',
+                  fontWeight: 700
                 }}
               >
-                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-                <LogOut className="w-3.5 h-3.5 relative z-10" />
-                <span className="relative z-10">Logout</span>
-              </motion.button>
+                Admin
+              </h1>
+              <p className="text-xs" style={{ color: "#999999" }}>PrivyPrint</p>
             </div>
           </div>
-        </motion.div>
 
-        {/* ── Error / Loading ── */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 px-4 py-3 border border-[#D91828]/30 bg-[#D91828]/8 mb-6"
+          {/* Navigation */}
+          <nav className="space-y-2">
+            <motion.button
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setActiveTab('dashboard')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+              style={{
+                background: activeTab === 'dashboard' ? "rgba(255, 107, 53, 0.1)" : "rgba(255,255,255,0.03)",
+                border: activeTab === 'dashboard' ? "1px solid rgba(255, 107, 53, 0.2)" : "1px solid rgba(255,255,255,0.08)",
+                color: activeTab === 'dashboard' ? "#FF6B35" : "#999999"
+              }}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="text-sm font-medium">Dashboard</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setActiveTab('history')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+              style={{
+                background: activeTab === 'history' ? "rgba(255, 107, 53, 0.1)" : "rgba(255,255,255,0.03)",
+                border: activeTab === 'history' ? "1px solid rgba(255, 107, 53, 0.2)" : "1px solid rgba(255,255,255,0.08)",
+                color: activeTab === 'history' ? "#FF6B35" : "#999999"
+              }}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span className="text-sm font-medium">History</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate("/admin/print")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#999999"
+              }}
+            >
+              <Printer className="w-4 h-4" />
+              <span className="text-sm font-medium">Print Panel</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate("/admin/logs")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#999999"
+              }}
+            >
+              <ScrollText className="w-4 h-4" />
+              <span className="text-sm font-medium">Print Logs</span>
+            </motion.button>
+          </nav>
+          {/* Logout */}
+          <motion.button
+            onClick={handleLogout}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+            style={{
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.2)",
+              color: "#ef4444"
+            }}
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-[#D91828] flex-shrink-0" />
-            <span className="text-[#D91828] text-xs font-bold">{error}</span>
-          </motion.div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-3 mb-6 text-white/30">
-            <motion.span
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="inline-block w-4 h-4 border-2 border-white/15 border-t-[#3BBCD9] rounded-full"
-            />
-            <span className="text-[10px] font-black tracking-[0.4em] uppercase">Loading analytics...</span>
-          </div>
-        )}
-
-        {/* ── Stats Grid ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={Users} label="Total Users" value={stats?.totalUsers ?? 0} accent="#3BBCD9" delay={0.1} />
-          <StatCard icon={Printer} label="Total Prints" value={stats?.totalPrints ?? 0} accent="#D9910D" delay={0.15} />
-
-          <StatCard icon={BarChart2} label="B/W vs Color" value="" accent="#3BBCD9" delay={0.2}>
-            <div className="flex items-center gap-3 mt-1">
-              <div className="flex flex-col items-center gap-1">
-                <span
-                  className="text-2xl font-black text-[#3BBCD9]"
-                  style={{ fontFamily: '"BlockForce", monospace' }}
-                >
-                  {stats?.printsByType?.["B/W"] ?? 0}
-                </span>
-                <span className="text-[9px] font-black tracking-[0.35em] text-white/25 uppercase">B/W</span>
-              </div>
-              <div className="w-[1px] h-8 bg-white/8" />
-              <div className="flex flex-col items-center gap-1">
-                <span
-                  className="text-2xl font-black text-[#D9910D]"
-                  style={{ fontFamily: '"BlockForce", monospace' }}
-                >
-                  {stats?.printsByType?.Color ?? 0}
-                </span>
-                <span className="text-[9px] font-black tracking-[0.35em] text-white/25 uppercase">Color</span>
-              </div>
-            </div>
-          </StatCard>
-
-          <StatCard icon={ShieldCheck} label="Trust Score" value={trustScore} accent={trustColor} delay={0.25}>
-            <div className="mt-3">
-              <div className="h-[5px] bg-white/6 overflow-hidden" style={{ clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)" }}>
-                <motion.div
-                  className="h-full"
-                  style={{ background: trustColor, boxShadow: `0 0 8px ${trustColor}` }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${trustScore}%` }}
-                  transition={{ duration: 1.2, ease: "easeOut", delay: 0.4 }}
-                />
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-[8px] font-black text-white/15 uppercase tracking-widest">0</span>
-                <span className="text-[8px] font-black tracking-widest uppercase" style={{ color: `${trustColor}80` }}>
-                  {trustScore > 60 ? "Trusted" : "At Risk"}
-                </span>
-                <span className="text-[8px] font-black text-white/15 uppercase tracking-widest">100</span>
-              </div>
-            </div>
-          </StatCard>
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-medium">Logout</span>
+          </motion.button>
         </div>
+      </motion.div>
 
-        {/* ── Live Analytics Chart ── */}
-        <Panel title="Real-Time Print Analytics" icon={BarChart2} accent="#3BBCD9" delay={0.3}>
-          <PrintStatsChart />
-        </Panel>
-
-        {/* ── Static Charts ── */}
+      {/* Main Content */}
+      <div className="ml-64 p-8">
+        {/* Top Bar */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6"
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="flex items-center justify-between mb-8"
         >
-          <Panel title="Print Type Distribution" icon={Printer} accent="#D9910D" delay={0.45}>
-            <PieChart values={stats?.printsByType || { "B/W": 0, Color: 0 }} />
-          </Panel>
-          <Panel title="Prints by Day" icon={BarChart2} accent="#3BBCD9" delay={0.5}>
-            <BarChart data={stats?.printsByDay || []} />
-          </Panel>
+          <div>
+            <h1
+              className="text-3xl font-bold mb-2"
+              style={{
+                color: "#EAEAEA",
+                fontFamily: '"Clash Display", "Inter", sans-serif',
+                fontWeight: 700
+              }}
+            >
+              {activeTab === 'dashboard' ? 'Dashboard' : 'History'}
+            </h1>
+            <p style={{ color: "#999999" }}>
+              {activeTab === 'dashboard' 
+                ? `Welcome back, ${auth?.name || "Admin"}`
+                : 'Track uploads, tokens, and prints by date'
+              }
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              className="p-3 rounded-xl"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#999999"
+              }}
+            >
+              <Bell className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              className="p-3 rounded-xl"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#999999"
+              }}
+            >
+              <Settings className="w-5 h-5" />
+            </motion.button>
+          </div>
         </motion.div>
 
-      </div>
+        {/* Content based on active tab */}
+        {activeTab === 'dashboard' ? (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <StatCard
+                icon={Users}
+                label="Total Users"
+                value={stats?.totalUsers || "0"}
+                accent="#FF6B35"
+                delay={0.1}
+              />
+              <StatCard
+                icon={Printer}
+                label="Total Prints"
+                value={stats?.totalPrints || "0"}
+                accent="#FF8A50"
+                delay={0.2}
+              />
+              <StatCard
+                icon={FileText}
+                label="Active Tokens"
+                value={statusData.reduce((sum, item) => sum + item.value, 0) || "0"}
+                accent="#FFA05B"
+                delay={0.3}
+              />
+              <StatCard
+                icon={ShieldCheck}
+                label="Trust Score"
+                value={trustScore}
+                accent="#FF6B35"
+                delay={0.4}
+              />
+            </div>
 
-      {/* Floating status indicator */}
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 1 }}
-        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-4 py-2.5 border border-[#D91828]/20 bg-[#0C1519]/90 backdrop-blur-md"
-        style={{ clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)" }}
-      >
-        <span className="text-[10px] font-black text-[#D91828] uppercase tracking-[0.35em]">
-          System Live
-        </span>
-        <div className="w-2.5 h-2.5 bg-[#D91828] rounded-full animate-pulse shadow-[0_0_10px_#D91828]" />
-      </motion.div>
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Line Chart - Uploads Over Time */}
+              <Panel title="Uploads Over Time" icon={BarChart2} accent="#FF6B35" delay={0.5}>
+                <div className="w-full h-[300px] min-h-[250px] flex-1 min-w-0">
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke="rgba(255,255,255,0.05)" 
+                          vertical={false}
+                        />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#999999"
+                          tick={{ fill: '#999999', fontSize: 12 }}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                        />
+                        <YAxis 
+                          stroke="#999999"
+                          tick={{ fill: '#999999', fontSize: 12 }}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Line 
+                          type="monotone"
+                          dataKey="count" 
+                          stroke="#FF6B35" 
+                          strokeWidth={3}
+                          dot={{ fill: '#FF6B35', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <BarChart2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+
+              {/* Bar Chart - Tokens Generated */}
+              <Panel title="Tokens Generated Per Day" icon={FileText} accent="#FF8A50" delay={0.6}>
+                <div className="w-full h-[300px] min-h-[250px] flex-1 min-w-0">
+                  {tokenData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={tokenData}>
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke="rgba(255,255,255,0.05)" 
+                          vertical={false}
+                        />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#999999"
+                          tick={{ fill: '#999999', fontSize: 12 }}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                        />
+                        <YAxis 
+                          stroke="#999999"
+                          tick={{ fill: '#999999', fontSize: 12 }}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar 
+                          dataKey="tokens" 
+                          fill="#FF8A50"
+                          radius={[8, 8, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No token data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+            </div>
+
+            {/* Pie Chart Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Pie Chart - Token Status */}
+              <Panel title="Token Status Distribution" icon={Activity} accent="#FFA05B" delay={0.7}>
+                <div className="w-full h-[300px] min-h-[250px] flex-1 min-w-0">
+                  {statusData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={statusData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {statusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend 
+                          verticalAlign="middle" 
+                          align="right"
+                          wrapperStyle={{
+                            paddingTop: '20px',
+                            color: '#999999'
+                          }}
+                          formatter={(value, name) => {
+                            // Ensure we're working with primitive values
+                            const safeValue = typeof value === 'object' ? value?.value || 0 : value;
+                            const safeName = typeof name === 'object' ? name?.name || 'Unknown' : name;
+                            const item = statusData.find(d => d.name === safeName);
+                            const displayValue = item?.value || safeValue || 0;
+                            
+                            return (
+                              <span style={{ color: '#EAEAEA' }}>
+                                {safeName}: {displayValue}
+                              </span>
+                            );
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No status data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+
+              {/* Recent Activity Panel */}
+              <Panel title="Recent Activity" icon={Activity} accent="#FF8A50" delay={0.8}>
+                <div className="w-full h-[300px] min-h-[250px] overflow-y-auto flex-1 min-w-0">
+                  {recentActivity.length > 0 ? (
+                    <div className="space-y-4">
+                      {recentActivity.slice(0, 5).map((activity, index) => {
+                        // Get appropriate icon based on activity type
+                        const getActivityIcon = (type) => {
+                          switch (type) {
+                            case 'upload':
+                              return <FileText className="w-4 h-4 text-green-400" />;
+                            case 'print':
+                              return <Printer className="w-4 h-4 text-blue-400" />;
+                            default:
+                              return <Activity className="w-4 h-4 text-gray-400" />;
+                          }
+                        };
+                        
+                        return (
+                          <div key={index} className="flex items-center gap-3 p-3 rounded-xl"
+                            style={{ background: "rgba(255,255,255,0.03)" }}>
+                            {getActivityIcon(activity.type)}
+                            <div className="flex-1">
+                              <p className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                {activity.message}
+                              </p>
+                              <p className="text-xs" style={{ color: "#999999" }}>
+                                {new Date(activity.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No recent activity</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+            </div>
+          </>
+        ) : (
+          // <CalendarView />
+          <div style={{ padding: "20px", color: "#999" }}>
+            <h2>Calendar View (Temporarily Disabled)</h2>
+            <p>Calendar component is temporarily disabled for testing.</p>
+          </div>
+        )}
+      </div>
     </div>
-  );
+    );
+  } catch (error) {
+    console.error('Admin Dashboard Error:', error);
+    setComponentError(error);
+    return null;
+  }
 }

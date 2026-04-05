@@ -129,6 +129,14 @@ async function signup(req, res) {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Ensure OTP is exactly 6 digits
+    if (otp.length !== 6) {
+      console.error("Generated OTP is not 6 digits:", otp);
+      return res.status(500).json({ message: "OTP generation failed" });
+    }
+    
+    console.log("🔢 Generated 6-digit OTP:", otp);
     const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
 
     const saltRounds = 10;
@@ -169,6 +177,24 @@ async function verifyOTP(req, res) {
   const { email, otp } = req.body;
 
   try {
+    // Validate input
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required"
+      });
+    }
+    
+    // Validate OTP format (must be exactly 6 digits)
+    if (!/^[0-9]{6}$/.test(otp.toString().trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP format. OTP must be exactly 6 digits."
+      });
+    }
+    
+    console.log("🔍 Verifying OTP:", { email, otp });
+
     // Normalizing input to match signup storage
     const normalizedEmail = email?.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
@@ -182,10 +208,19 @@ async function verifyOTP(req, res) {
         .json({ message: "OTP has expired. Please signup again." });
     }
 
-    // B. Check if code matches (using .trim() to handle accidental spaces)
-    if (user.otp !== otp?.toString().trim()) {
-      return res.status(400).json({ message: "Invalid Code" });
+    // B. Strict OTP validation - check if code matches exactly
+    const storedOtp = user.otp?.toString();
+    const enteredOtp = otp?.toString().trim();
+    
+    if (storedOtp !== enteredOtp) {
+      console.log("❌ OTP mismatch:", { stored: storedOtp, entered: enteredOtp });
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect OTP"
+      });
     }
+    
+    console.log("✅ OTP verification successful");
 
     // C. Update User Status
     user.isVerified = true;
@@ -193,7 +228,21 @@ async function verifyOTP(req, res) {
     user.otpExpires = undefined;
     await user.save();
 
-    res.status(200).json({ message: "Verification successful!" });
+    // D. Generate JWT token for automatic login after verification
+    const token = signJWT(user);
+
+    res.status(200).json({
+      success: true,
+      message: "Verification successful!",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        trustScore: user.trustScore,
+      }
+    });
   } catch (err) {
     res
       .status(500)
@@ -252,7 +301,55 @@ async function login(req, res) {
   }
 }
 
-// 4. DEV ONLY: Clear users
+// 4. VERIFY TOKEN: Check if JWT token is valid and return user info
+async function verifyToken(req, res) {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Token is required." });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Find user by ID from token
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      return res.status(401).json({ message: "Invalid token - user not found." });
+    }
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(403).json({ 
+        message: "Account not verified. Please check your email for the OTP.",
+        notVerified: true 
+      });
+    }
+
+    // Return user data (excluding password)
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        trustScore: user.trustScore,
+      }
+    });
+  } catch (err) {
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: "Invalid token." });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: "Token expired." });
+    }
+    return res.status(500).json({ message: "Token verification failed.", error: err.message });
+  }
+}
+
+// 5. DEV ONLY: Clear users
 const deleteAllUsers = async (req, res) => {
   try {
     const result = await User.deleteMany({});
@@ -268,4 +365,4 @@ const deleteAllUsers = async (req, res) => {
 };
 
 // Exporting using CommonJS to match your require statements
-module.exports = { signup, login, verifyOTP, deleteAllUsers };
+module.exports = { signup, login, verifyOTP, verifyToken, deleteAllUsers };

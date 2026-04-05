@@ -1,17 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api } from "../services/api";
+import { api } from "../../services/api";
+import { setAuth, getAuth } from "../../services/authStorage";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion, api);
-import {
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Shield,
-  Mail,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertCircle, Shield, Mail } from "lucide-react";
 
-export default function VerifyOtp() {
+export default function AdminVerifyOtp() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -21,22 +15,22 @@ export default function VerifyOtp() {
   const email = location.state?.email;
   const inputRefs = useRef([]);
 
+  // If no email is provided, redirect back to admin signup
+  if (!email) {
+    alert("Session expired. Please signup again.");
+    navigate("/admin/signup");
+    return null;
+  }
+
   // Auto-focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
 
-  // If no email is provided, redirect back to signup
-  if (!email) {
-    alert("Session expired. Please signup again.");
-    navigate("/signup");
-    return null;
-  }
-
   const handleInputChange = (index, value) => {
     // Only allow single digit (0-9)
     if (!/^[0-9]?$/.test(value)) return;
-
+    
     const newOtp = otp.split("");
     newOtp[index] = value;
     const otpString = newOtp.join("");
@@ -58,20 +52,19 @@ export default function VerifyOtp() {
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData
-      .getData("text")
-      .replace(/\D/g, "")
-      .slice(0, 6);
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     const newOtp = pastedData.padEnd(6, "");
     setOtp(newOtp);
-
-    // Focus the next empty input or the last one
-    const nextEmptyIndex = newOtp.findIndex((val) => val === "");
+    
+    // Focus on next empty input or the last one
+    const nextEmptyIndex = newOtp.findIndex(val => val === "");
     const focusIndex = nextEmptyIndex === -1 ? 5 : nextEmptyIndex;
     inputRefs.current[focusIndex]?.focus();
   };
 
   const handleVerify = async () => {
+    console.log("Admin OTP Verify button clicked!"); // Debug log
+    
     if (otp.length !== 6) {
       setError("OTP must be exactly 6 digits");
       return;
@@ -79,58 +72,61 @@ export default function VerifyOtp() {
 
     setError("");
     setLoading(true);
-
+    
     try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, otp: otp }),
+      const res = await api.post("/auth/verify-otp", {
+        email: email,
+        otp: otp
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        // 1. Trigger the success animation
-        setSuccess(true);
-
-        // 2. Get the role from the state we passed from Signup
-        const userRole = location.state?.role;
-
-        // 3. Optional: If your verify-otp returns token/user, set it like your login
-        if (data.token && data.user) {
-          // setAuth({ token: data.token, ...data.user }); // If using AuthContext
-          localStorage.setItem("token", data.token);
+      if (res.data.success) {
+        console.log("OTP Verification response:", res.data);
+        
+        // Store authentication token and user data
+        if (res.data.token && res.data.user) {
+          const authData = {
+            token: res.data.token,
+            user: res.data.user
+          };
+          console.log("Storing auth data:", authData);
+          setAuth(authData);
+          
+          // Verify it was stored correctly
+          const storedAuth = getAuth();
+          console.log("Stored auth verification:", storedAuth);
+          console.log("User role from stored auth:", storedAuth?.user?.role);
         }
-
-        // 4. Final Conditional Redirect
+        
+        // Always redirect to admin dashboard for admin OTP verification
+        alert("Admin OTP Verified Successfully");
+        console.log("Redirecting to /admin/dashboard");
+        
+        // Add a small delay to ensure auth is stored before redirect
         setTimeout(() => {
-          if (userRole === "admin") {
-            navigate("/admin/dashboard");
-          } else {
-            navigate("/upload");
-          }
-        }, 1500); // 1.5s delay to show the success checkmark
+          navigate("/admin/dashboard");
+        }, 100);
       } else {
-        setError(data.message || "Invalid OTP");
+        setError(res.data.message || "Invalid OTP");
       }
     } catch (err) {
-      setError("Server error");
+      console.error("Admin OTP verification error:", err);
+      setError(err.response?.data?.message || "Invalid OTP");
     } finally {
       setLoading(false);
     }
   };
 
-  console.log("OTP state:", otp, "length:", otp.length); // Debug OTP state
+  console.log("Admin OTP state:", otp, "length:", otp.length); // Debug OTP state
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
-      <div className="absolute inset-0 bg-gradient-to-t from-orange-950/20 via-transparent to-amber-950/20" />
-
+      <div className="absolute inset-0 bg-gradient-to-t from-red-950/30 via-transparent to-orange-950/20" />
+      
       {/* Animated Orbs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Back Button */}
@@ -138,11 +134,11 @@ export default function VerifyOtp() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          onClick={() => navigate(-1)}
-          className="absolute -top-16 left-0 flex items-center gap-2 text-white/60 hover:text-orange-400 transition-colors duration-200"
+          onClick={() => navigate("/admin/login")}
+          className="absolute -top-16 left-0 flex items-center gap-2 text-white/60 hover:text-red-400 transition-colors duration-200"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back</span>
+          <span className="text-sm">Back to Admin Login</span>
         </motion.button>
 
         <motion.div
@@ -151,18 +147,17 @@ export default function VerifyOtp() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="relative"
           style={{
-            background: "rgba(255,255,255,0.05)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,107,53,0.2)",
-            borderRadius: "24px",
-            boxShadow:
-              "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,107,53,0.15)",
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: '24px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(239,68,68,0.15)'
           }}
         >
           {/* Glow Effect */}
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 pointer-events-none" />
-
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-red-500/10 to-orange-500/10 pointer-events-none" />
+          
           <div className="relative p-8">
             {/* Success State */}
             {success ? (
@@ -180,7 +175,7 @@ export default function VerifyOtp() {
                 >
                   <CheckCircle2 className="w-10 h-10 text-white" />
                 </motion.div>
-
+                
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -188,9 +183,9 @@ export default function VerifyOtp() {
                   className="text-2xl font-bold text-white mb-2"
                   style={{ fontFamily: '"Inter Tight", sans-serif' }}
                 >
-                  Verification Successful!
+                  Admin Verification Successful!
                 </motion.h2>
-
+                
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -198,7 +193,7 @@ export default function VerifyOtp() {
                   className="text-white/60"
                   style={{ fontFamily: '"Inter", sans-serif' }}
                 >
-                  Redirecting to your dashboard...
+                  Redirecting to admin dashboard...
                 </motion.p>
               </motion.div>
             ) : (
@@ -209,21 +204,21 @@ export default function VerifyOtp() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.5 }}
-                    className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25"
+                    className="w-16 h-16 bg-gradient-to-br from-red-600 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-600/25"
                   >
                     <Shield className="w-8 h-8 text-white" />
                   </motion.div>
-
+                  
                   <motion.h1
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
+                    transition={{ delay: 0.2, duration: 0.6 }}
                     className="text-2xl font-bold text-white mb-2"
                     style={{ fontFamily: '"Inter Tight", sans-serif' }}
                   >
-                    Verify Your Email
+                    Verify Admin Email
                   </motion.h1>
-
+                  
                   <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -233,14 +228,14 @@ export default function VerifyOtp() {
                   >
                     We've sent a 6-digit code to
                   </motion.p>
-
+                  
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.5 }}
                     className="flex items-center justify-center gap-2 mt-2 text-white/80"
                   >
-                    <Mail className="w-4 h-4 text-orange-400" />
+                    <Mail className="w-4 h-4 text-red-400" />
                     <span className="text-sm font-medium">{email}</span>
                   </motion.div>
                 </div>
@@ -256,17 +251,15 @@ export default function VerifyOtp() {
                         transition={{ delay: 0.1 + index * 0.1, duration: 0.5 }}
                       >
                         <input
-                          ref={(el) => (inputRefs.current[index] = el)}
+                          ref={el => inputRefs.current[index] = el}
                           type="text"
                           inputMode="numeric"
                           maxLength={1}
                           value={otp[index] || ""}
-                          onChange={(e) =>
-                            handleInputChange(index, e.target.value)
-                          }
+                          onChange={(e) => handleInputChange(index, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(index, e)}
                           onPaste={index === 0 ? handlePaste : undefined}
-                          className="w-14 h-14 text-center text-2xl font-bold text-white bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200"
+                          className="w-14 h-14 text-center text-2xl font-bold text-white bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
                           style={{ fontFamily: '"Inter Tight", sans-serif' }}
                         />
                       </motion.div>
@@ -292,15 +285,13 @@ export default function VerifyOtp() {
                   <motion.button
                     type="button"
                     disabled={loading || otp.length !== 6}
-                    whileHover={{
-                      scale: loading || otp.length !== 6 ? 1 : 1.02,
-                    }}
+                    whileHover={{ scale: loading || otp.length !== 6 ? 1 : 1.02 }}
                     whileTap={{ scale: loading || otp.length !== 6 ? 1 : 0.98 }}
                     onClick={handleVerify}
                     className={`w-full py-4 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 relative overflow-hidden group z-20 cursor-pointer pointer-events-auto ${
                       otp.length === 6 && !loading
-                        ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 ring-2 ring-orange-500/50 ring-offset-0 ring-offset-transparent"
-                        : "bg-gray-600 opacity-50 cursor-not-allowed"
+                        ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 ring-2 ring-red-500/50 ring-offset-0 ring-offset-transparent'
+                        : 'bg-gray-600 opacity-50 cursor-not-allowed'
                     }`}
                     style={{ fontFamily: '"Inter Tight", sans-serif' }}
                   >
@@ -310,18 +301,14 @@ export default function VerifyOtp() {
                         <>
                           <motion.div
                             animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 1,
-                              repeat: Infinity,
-                              ease: "linear",
-                            }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                           />
                           Verifying...
                         </>
                       ) : (
                         <>
-                          Verify OTP
+                          Verify Admin OTP
                           <Shield className="w-5 h-5" />
                         </>
                       )}

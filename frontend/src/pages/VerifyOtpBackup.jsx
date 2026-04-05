@@ -2,14 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion, api);
-import {
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Shield,
-  Mail,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertCircle, Shield, Mail } from "lucide-react";
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
@@ -21,27 +14,25 @@ export default function VerifyOtp() {
   const email = location.state?.email;
   const inputRefs = useRef([]);
 
+  // If no email is provided, redirect back to signup
+  if (!email) {
+    navigate("/signup");
+    return null;
+  }
+
   // Auto-focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
 
-  // If no email is provided, redirect back to signup
-  if (!email) {
-    alert("Session expired. Please signup again.");
-    navigate("/signup");
-    return null;
-  }
-
   const handleInputChange = (index, value) => {
     // Only allow single digit (0-9)
     if (!/^[0-9]?$/.test(value)) return;
-
-    const newOtp = otp.split("");
+    
+    const newOtp = otp.split(" \);
     newOtp[index] = value;
-    const otpString = newOtp.join("");
-    setOtp(otpString);
-    console.log("OTP updated:", otpString); // Debug OTP update
+    setOtp(newOtp);
+    console.log("OTP updated:", newOtp); // Debug OTP update
 
     // Auto-focus next input
     if (value && index < 5) {
@@ -58,76 +49,59 @@ export default function VerifyOtp() {
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData
-      .getData("text")
-      .replace(/\D/g, "")
-      .slice(0, 6);
-    const newOtp = pastedData.padEnd(6, "");
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const newOtp = pastedData.split("").concat(Array(6 - pastedData.length).fill(""));
     setOtp(newOtp);
-
+    
     // Focus the next empty input or the last one
-    const nextEmptyIndex = newOtp.findIndex((val) => val === "");
+    const nextEmptyIndex = newOtp.findIndex(val => val === "");
     const focusIndex = nextEmptyIndex === -1 ? 5 : nextEmptyIndex;
     inputRefs.current[focusIndex]?.focus();
   };
 
-  const handleVerify = async () => {
-    if (otp.length !== 6) {
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    console.log("Verify button clicked!"); // Debug log
+    const otpString = otp.join("");
+    
+    if (otpString.length !== 6) {
       setError("OTP must be exactly 6 digits");
       return;
     }
 
     setError("");
     setLoading(true);
-
+    
     try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, otp: otp }),
+      const res = await api.post("/auth/verify-otp", {
+        email,
+        otp: otpString,
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        // 1. Trigger the success animation
+      if (res.status === 200) {
         setSuccess(true);
-
-        // 2. Get the role from the state we passed from Signup
-        const userRole = location.state?.role;
-
-        // 3. Optional: If your verify-otp returns token/user, set it like your login
-        if (data.token && data.user) {
-          // setAuth({ token: data.token, ...data.user }); // If using AuthContext
-          localStorage.setItem("token", data.token);
-        }
-
-        // 4. Final Conditional Redirect
+        
+        // Redirect to upload page after successful verification
         setTimeout(() => {
-          if (userRole === "admin") {
-            navigate("/admin/dashboard");
-          } else {
-            navigate("/upload");
-          }
-        }, 1500); // 1.5s delay to show the success checkmark
-      } else {
-        setError(data.message || "Invalid OTP");
+          navigate("/upload");
+        }, 1500);
       }
     } catch (err) {
-      setError("Server error");
+      setError(err.response?.data?.message || "Invalid OTP");
     } finally {
       setLoading(false);
     }
   };
 
-  console.log("OTP state:", otp, "length:", otp.length); // Debug OTP state
+  const isComplete = otp.every(digit => digit !== "");
+  console.log("OTP state:", otp, "isComplete:", isComplete); // Debug OTP state
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
       <div className="absolute inset-0 bg-gradient-to-t from-orange-950/20 via-transparent to-amber-950/20" />
-
+      
       {/* Animated Orbs */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -151,18 +125,17 @@ export default function VerifyOtp() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="relative"
           style={{
-            background: "rgba(255,255,255,0.05)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,107,53,0.2)",
-            borderRadius: "24px",
-            boxShadow:
-              "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,107,53,0.15)",
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,107,53,0.2)',
+            borderRadius: '24px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,107,53,0.15)'
           }}
         >
           {/* Glow Effect */}
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 pointer-events-none" />
-
+          
           <div className="relative p-8">
             {/* Success State */}
             {success ? (
@@ -180,7 +153,7 @@ export default function VerifyOtp() {
                 >
                   <CheckCircle2 className="w-10 h-10 text-white" />
                 </motion.div>
-
+                
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -190,7 +163,7 @@ export default function VerifyOtp() {
                 >
                   Verification Successful!
                 </motion.h2>
-
+                
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -213,7 +186,7 @@ export default function VerifyOtp() {
                   >
                     <Shield className="w-8 h-8 text-white" />
                   </motion.div>
-
+                  
                   <motion.h1
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -223,7 +196,7 @@ export default function VerifyOtp() {
                   >
                     Verify Your Email
                   </motion.h1>
-
+                  
                   <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -233,7 +206,7 @@ export default function VerifyOtp() {
                   >
                     We've sent a 6-digit code to
                   </motion.p>
-
+                  
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -246,7 +219,7 @@ export default function VerifyOtp() {
                 </div>
 
                 {/* OTP Input */}
-                <div className="space-y-6 relative z-30">
+                <form onSubmit={handleVerify} className="space-y-6 relative z-30">
                   <div className="flex justify-center gap-3 mb-8">
                     {[...Array(6)].map((_, index) => (
                       <motion.div
@@ -256,14 +229,12 @@ export default function VerifyOtp() {
                         transition={{ delay: 0.1 + index * 0.1, duration: 0.5 }}
                       >
                         <input
-                          ref={(el) => (inputRefs.current[index] = el)}
+                          ref={el => inputRefs.current[index] = el}
                           type="text"
                           inputMode="numeric"
                           maxLength={1}
                           value={otp[index] || ""}
-                          onChange={(e) =>
-                            handleInputChange(index, e.target.value)
-                          }
+                          onChange={(e) => handleInputChange(index, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(index, e)}
                           onPaste={index === 0 ? handlePaste : undefined}
                           className="w-14 h-14 text-center text-2xl font-bold text-white bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200"
@@ -290,18 +261,11 @@ export default function VerifyOtp() {
 
                   {/* Verify Button */}
                   <motion.button
-                    type="button"
-                    disabled={loading || otp.length !== 6}
-                    whileHover={{
-                      scale: loading || otp.length !== 6 ? 1 : 1.02,
-                    }}
-                    whileTap={{ scale: loading || otp.length !== 6 ? 1 : 0.98 }}
-                    onClick={handleVerify}
-                    className={`w-full py-4 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 relative overflow-hidden group z-20 cursor-pointer pointer-events-auto ${
-                      otp.length === 6 && !loading
-                        ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 ring-2 ring-orange-500/50 ring-offset-0 ring-offset-transparent"
-                        : "bg-gray-600 opacity-50 cursor-not-allowed"
-                    }`}
+                    type="submit"
+                    disabled={loading || !isComplete}
+                    whileHover={{ scale: loading || !isComplete ? 1 : 1.02 }}
+                    whileTap={{ scale: loading || !isComplete ? 1 : 0.98 }}
+                    className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group z-20"
                     style={{ fontFamily: '"Inter Tight", sans-serif' }}
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
@@ -310,11 +274,7 @@ export default function VerifyOtp() {
                         <>
                           <motion.div
                             animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 1,
-                              repeat: Infinity,
-                              ease: "linear",
-                            }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                           />
                           Verifying...
@@ -327,7 +287,7 @@ export default function VerifyOtp() {
                       )}
                     </span>
                   </motion.button>
-                </div>
+                </form>
               </>
             )}
           </div>

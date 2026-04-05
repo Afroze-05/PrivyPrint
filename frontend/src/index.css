@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.cdnfonts.com/css/clash-display');
+@import url('https://fonts.cdnfonts.com/css/satoshi');
 @import "tailwindcss";
 
 :root {
@@ -27,6 +29,10 @@
   --sp-border: rgba(15, 23, 42, 0.12);
   --sp-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   --sp-radius: 18px;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 *, *::before, *::after {

@@ -10,19 +10,20 @@ const documentRoutes = require("./routes/documentRoutes");
 const alertRoutes = require("./routes/alertRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const logsRoutes = require("./routes/logsRoutes");
+const testRoutes = require("./routes/testRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
 // Middleware
 app.use(
   cors({
-    origin: "http://localhost:5173", // Allow your Vite frontend
-    credentials: false,
+    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"], // Allow your Vite frontend
+    credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
-app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,12 +35,41 @@ app.get("/", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+// Test route directly in server.js
+app.post("/api/direct-test", (req, res) => {
+  console.log('🔧 direct-test route called');
+  res.json({ message: "Direct test works" });
+});
+
+// Test route for API connectivity verification
+app.post("/api/test-route", (req, res) => {
+  console.log('🔧 test-route called');
+  res.json({ message: "API working" });
+});
+
+
 // Routes
-app.use("/api/auth", authRoutes);
-app.use("/api", documentRoutes);
-app.use("/api", alertRoutes);
-app.use("/api", statsRoutes);
-app.use("/api", logsRoutes);
+console.log("🔧 Registering routes...");
+try {
+  const authRoutes = require("./routes/authRoutes");
+  const documentRoutes = require("./routes/documentRoutes");
+  const alertRoutes = require("./routes/alertRoutes");
+  const statsRoutes = require("./routes/statsRoutes");
+  const logsRoutes = require("./routes/logsRoutes");
+  const testRoutes = require("./routes/testRoutes");
+  const adminRoutes = require("./routes/adminRoutes");
+  
+  app.use("/api/auth", authRoutes);
+  app.use("/api", documentRoutes);
+  app.use("/api", alertRoutes);
+  app.use("/api", statsRoutes);
+  app.use("/api", logsRoutes);
+  app.use("/api/test", testRoutes);
+  app.use("/api", adminRoutes);
+  console.log("🔧 All routes registered");
+} catch (error) {
+  console.error("❌ Error loading routes:", error);
+}
 
 // 404 handler
 app.use((req, res) => {

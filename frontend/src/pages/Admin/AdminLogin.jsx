@@ -828,73 +828,27 @@
 
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { api } from "../../services/api";
-import { setAuth } from "../../services/authStorage";
-import { Mail, Lock, ChevronRight, ArrowLeft, Cpu } from "lucide-react";
-import logoImg from "../../assets/logo1.png";
+import { setAuth, getAuth } from "../../services/authStorage";
 
-/* ── Restoration: Layer 1 - Noise grain overlay ── */
-const NoiseSVG = () => (
-  <svg className="absolute inset-0 w-full h-full opacity-[0.05] pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
-    <filter id="noise">
-      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
-      <feColorMatrix type="saturate" values="0" />
-    </filter>
-    <rect width="100%" height="100%" filter="url(#noise)" />
-  </svg>
-);
-
-/* ── Restoration: Layer 2 - Grid dots ── */
-const GridDots = () => (
-  <div className="absolute inset-0 pointer-events-none opacity-[0.06]"
-    style={{ backgroundImage: `radial-gradient(circle, #f26716 1px, transparent 1px)`, backgroundSize: "36px 36px" }}
-  />
-);
-
-/* ── Restoration: Layer 3 - Animated Glow Orbs ── */
-const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
-  <motion.div
-    className="absolute rounded-full blur-3xl pointer-events-none"
-    style={{ width: size, height: size, top, left, background: color }}
-    animate={{ scale: [1, 1.15, 1], opacity: [0.1, 0.18, 0.1] }}
-    transition={{ duration: 7, repeat: Infinity, delay, ease: "easeInOut" }}
-  />
-);
-
-const Field = ({ label, icon: Icon, type = "text", value, onChange, placeholder, required }) => (
-  <div className="flex flex-col gap-2.5">
-    {/* BUMPED FONT SIZE: text-[13px] */}
-    <label className="text-[13px] font-black tracking-[0.45em] text-white/40 uppercase pl-1">
-      {label}
-    </label>
-    <div className="relative group">
-      {Icon && (
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-          <Icon className="w-5 h-5 text-white/30 group-focus-within:text-[#f26716] transition-colors duration-300" />
-        </div>
-      )}
-      <input
-        type={type} value={value} onChange={onChange} placeholder={placeholder} required={required}
-        /* BUMPED FONT SIZE: text-lg */
-        className="w-full bg-[#0d0d0d] border border-white/5 text-white text-lg font-medium
-          placeholder:text-white/20 focus:outline-none focus:border-[#f26716]/50
-          transition-all duration-300 py-5 pr-4 tracking-wide shadow-inner"
-        style={{
-          paddingLeft: Icon ? "3rem" : "1.25rem",
-          clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
-        }}
-      />
-    </div>
-  </div>
-);
-
-export default function CustomerLogin() {
+import { motion } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  ShieldCheck,
+  ArrowRight,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+console.log(motion, api, setAuth);
+export default function AdminLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -902,129 +856,284 @@ export default function CustomerLogin() {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", { email, password });
+      console.log("Admin login response:", res.data);
       const { token, user } = res.data;
-      setAuth({ token, ...user });
-      navigate("/upload");
+
+      if (user.role !== "admin") {
+        setError("Access denied. Admin account required.");
+        return;
+      }
+
+      // Store auth data in correct format
+      const authData = { token, user };
+      console.log("Storing admin auth data:", authData);
+      setAuth(authData);
+      
+      // Verify it was stored
+      const storedAuth = getAuth();
+      console.log("Stored admin auth:", storedAuth);
+      
+      console.log("Admin login successful, redirecting to dashboard");
+      navigate("/admin/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Access Denied: Invalid Credentials");
+      console.error("Admin login error:", err);
+      setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="relative min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center px-6 overflow-hidden font-sans">
-      <NoiseSVG />
-      <GridDots />
-      
-      {/* Background Ambience from your Palette */}
-      <GlowOrb color="#f26716" size={500} top="-10%" left="-10%" delay={0} />
-      <GlowOrb color="#a62f03" size={400} top="50%" left="60%" delay={2} />
+    <div
+      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+        fontFamily: '"Inter", sans-serif',
+      }}
+    >
+      {/* Background Elements */}
+      <div className="absolute inset-0">
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            background:
+              "radial-gradient(circle at 25% 25%, rgba(255, 107, 53, 0.1) 0%, transparent 50%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            background:
+              "radial-gradient(circle at 75% 75%, rgba(255, 138, 80, 0.08) 0%, transparent 50%)",
+          }}
+        />
+      </div>
 
+      {/* Login Card */}
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-md"
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-md mx-6"
       >
-       {/* ── TOP HEADER (Outside the box) ── */}
-        <div className="flex flex-col items-center mb-8 text-center">
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="w-64 h-32 mb-4 flex items-center justify-center relative z-10"
+        {/* Status Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="inline-flex items-center gap-3 mb-8 px-4 py-2 rounded-full"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            backdropFilter: "blur(16px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "#FF6B35",
+          }}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span className="text-sm font-medium">Admin Access</span>
+        </motion.div>
+
+        {/* Login Form */}
+        <div
+          className="relative backdrop-blur-xl border rounded-2xl p-8 overflow-hidden"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            backdropFilter: "blur(16px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)",
+          }}
+        >
+          {/* Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="text-4xl font-bold mb-2"
+            style={{
+              fontFamily: '"Clash Display", "Inter", sans-serif',
+              color: "#EAEAEA",
+              fontWeight: 700,
+              lineHeight: 1.1,
+            }}
           >
-            <img 
-              src={logoImg} 
-              alt="PrivyPrint" 
-              className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(242,103,22,0.6)]" 
-            /> 
-          </motion.div>
+            Admin{" "}
+            <motion.span
+              style={{
+                background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              Portal
+            </motion.span>
+          </motion.h1>
 
-          <h1 className="text-white font-black text-5xl tracking-tighter mb-0 uppercase">
-            Admin <span className="text-[#f26716]">Login</span>
-          </h1>
-          <p className="text-white/40 text-[14px] font-bold uppercase tracking-[0.5em]">
-            Secure Print Interface
-          </p>
-        </div>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="text-sm mb-8"
+            style={{
+              color: "#999999",
+              lineHeight: 1.6,
+            }}
+          >
+            Enter your credentials to access the admin dashboard
+          </motion.p>
 
-        {/* ── MAIN LOGIN BOX ── */}
-        <div className="bg-[#0d0d0d] backdrop-blur-2xl border border-white/5 p-10 shadow-2xl shadow-black/50 relative">
-          {/* Subtle Corner Accents */}
-          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[#f26716]/20" />
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#f26716]/20" />
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Email Input */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+            >
+              <label className="block text-sm font-medium text-white mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border transition-all duration-300"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#EAEAEA",
+                    fontFamily: '"Inter", sans-serif',
+                  }}
+                  placeholder="admin@example.com"
+                />
+              </div>
+            </motion.div>
 
-          <form onSubmit={handleLogin} className="space-y-8">
-            <Field
-              label="User Identifier"
-              icon={Mail}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@privyprint.com"
-              required
-            />
-            <Field
-              label="Security Password"
-              icon={Lock}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
+            {/* Password Input */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6, duration: 0.6 }}
+            >
+              <label className="block text-sm font-medium text-white mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Lock className="w-4 h-4 text-gray-400" />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pl-12 pr-12 py-3 rounded-xl border transition-all duration-300"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#EAEAEA",
+                    fontFamily: '"Inter", sans-serif',
+                  }}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </motion.div>
 
+            {/* Error Message */}
             {error && (
               <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] p-3 font-black uppercase tracking-widest text-center"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-xl border flex items-center gap-3"
+                style={{
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                }}
               >
-                {error}
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <p className="text-sm text-red-400">{error}</p>
               </motion.div>
             )}
 
-            <div className="space-y-4 pt-2">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#f26716] hover:bg-[#a62f03] text-white font-black py-5 px-6 
-                  transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-[#f26716]/20"
-                style={{ clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)" }}
-              >
-                {loading ? (
-                  <Cpu className="w-6 h-6 animate-spin" />
-                ) : (
-                  <>
-                    <span className="tracking-[0.2em] text-base">INITIALIZE PORTAL</span>
-                    <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
-              </motion.button>
+            {/* Login Button */}
+            <motion.button
+              type="submit"
+              disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02 }}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
+              className="relative w-full py-4 rounded-xl font-semibold text-white overflow-hidden transition-all duration-300 disabled:opacity-50"
+              style={{
+                background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+                fontFamily: '"Clash Display", "Inter", sans-serif',
+              }}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-3">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                  />
+                  <span>Authenticating...</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3">
+                  <span>Sign In</span>
+                  <ArrowRight className="w-5 h-5" />
+                </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => navigate("/admin/signup")}
-                className="w-full border border-white/10 hover:border-[#f26716]/50 text-white/40 hover:text-white py-4 px-6 
-                  transition-all duration-300 text-[11px] font-black uppercase tracking-[0.4em]"
-                style={{ clipPath: "polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px)" }}
-              >
-                Create New Account
-              </button>
-            </div>
+              {/* Hover shine effect */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                animate={{
+                  x: ["-100%", "100%"],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            </motion.button>
           </form>
-        </div>
 
-        <div className="mt-8 flex justify-center">
-          <button
-            onClick={() => navigate("/")}
-            className="group flex items-center gap-2 text-white/30 hover:text-white transition-all text-xs font-black uppercase tracking-widest"
+          {/* Footer Link */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="mt-8 text-center"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-2 transition-transform duration-300" />
-            Back to Home
-          </button>
+            <Link
+              to="/admin/signup"
+              className="text-sm hover:text-[#FF6B35] transition-colors duration-300"
+              style={{ color: "#999999" }}
+            >
+              Don't have an admin account? Sign up
+            </Link>
+          </motion.div>
         </div>
       </motion.div>
     </div>
