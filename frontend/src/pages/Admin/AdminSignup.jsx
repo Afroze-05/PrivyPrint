@@ -29,14 +29,11 @@ export default function AdminSignup() {
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
-
-      // IMPORTANT: Pass both email AND role to the OTP page
       navigate("/verify-otp", {
-        state: {
-          email: email,
-          role: "admin", // <--- Add this
-        },
+        // ← Only this
+        state: { email, role: "admin" },
       });
+      // Then in your VerifyOTP component, navigate to /admin/dashboard on success
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Signup failed.");
     } finally {

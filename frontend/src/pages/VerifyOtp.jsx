@@ -115,6 +115,7 @@ export default function VerifyOtp() {
       }
     } catch (err) {
       setError("Server error");
+      console.log(err);
     } finally {
       setLoading(false);
     }
