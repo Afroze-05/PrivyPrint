@@ -12,7 +12,8 @@ import {
   LogOut, Cpu, LayoutDashboard, ScrollText,
   Search, Filter, Settings, Bell, TrendingUp,
   FileText, Activity, Clock, CheckCircle, AlertCircle,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon, RefreshCw, Download, Eye,
+  IndianRupee, TrendingDown, User, File
 } from "lucide-react";
 // import CalendarView from "../../components/CalendarView";
 
@@ -175,6 +176,16 @@ export default function AdminDashboard() {
   
   // Active tab state
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'history'
+  
+  // History state
+  const [printHistory, setPrintHistory] = useState([]);
+  const [dailyRevenue, setDailyRevenue] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all', 'B/W', 'Color'
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   // Error boundary
   if (componentError) {
@@ -295,6 +306,45 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch print history and revenue
+  async function fetchHistoryData() {
+    setHistoryLoading(true);
+    setRevenueLoading(true);
+    try {
+      // TEMPORARY: Use test token for dashboard testing
+      const testToken = "test_admin_token_1775028546379";
+      const [historyRes, revenueRes] = await Promise.all([
+        api.get("/print-history", { headers: { Authorization: `Bearer ${testToken}` } }),
+        api.get("/daily-revenue", { headers: { Authorization: `Bearer ${testToken}` } })
+      ]);
+      
+      setPrintHistory(historyRes.data || []);
+      setDailyRevenue(revenueRes.data || null);
+      setLastRefreshTime(new Date());
+      console.log('History data loaded:', historyRes.data);
+      console.log('Revenue data loaded:', revenueRes.data);
+    } catch (err) {
+      console.error('Failed to fetch history data:', err);
+      setPrintHistory([]);
+      setDailyRevenue(null);
+    } finally {
+      setHistoryLoading(false);
+      setRevenueLoading(false);
+    }
+  }
+
+  // Real-time updates for history data
+  useEffect(() => {
+    if (activeTab === 'history' && autoRefreshEnabled) {
+      fetchHistoryData(); // Initial fetch when history tab is opened
+      
+      // Poll every 30 seconds only if auto-refresh is enabled
+      const interval = setInterval(fetchHistoryData, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, autoRefreshEnabled]);
+
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -389,6 +439,47 @@ export default function AdminDashboard() {
   }
 
   const trustColor = trustScore > 60 ? "#FF6B35" : "#FF6B35";
+
+  // Helper functions for History section
+  const filteredHistory = printHistory.filter(item => {
+    const matchesSearch = searchTerm === '' || 
+      item.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.token.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterType === 'all' || item.printType === filterType;
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const formatPrice = (price, currency = '₹') => {
+    return `${currency}${price}`;
+  };
+
+  const formatDateTime = (dateString) => {
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Printed': return '#22c55e';
+      case 'Pending': return '#FFA05B';
+      case 'Failed': return '#ef4444';
+      default: return '#999999';
+    }
+  };
+
+  const getPrintTypeColor = (type) => {
+    return type === 'B/W' ? '#FF8A50' : '#FF6B35';
+  };
 
   try {
     return (
@@ -796,11 +887,367 @@ export default function AdminDashboard() {
             </div>
           </>
         ) : (
-          // <CalendarView />
-          <div style={{ padding: "20px", color: "#999" }}>
-            <h2>Calendar View (Temporarily Disabled)</h2>
-            <p>Calendar component is temporarily disabled for testing.</p>
-          </div>
+          // History Section
+          <>
+            {/* Daily Revenue Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="mb-8"
+            >
+              <div 
+                className="relative backdrop-blur-xl border rounded-2xl p-6 overflow-hidden"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+                }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px]"
+                  style={{ background: "linear-gradient(to right, #FF6B35, transparent)" }} />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-xl"
+                        style={{ background: "rgba(255, 107, 53, 0.15)", border: "1px solid rgba(255, 107, 53, 0.3)" }}>
+                        <IndianRupee className="w-5 h-5" style={{ color: "#FF6B35" }} />
+                      </div>
+                      <div>
+                        <h3
+                          className="text-lg font-semibold"
+                          style={{
+                            color: "#EAEAEA",
+                            fontFamily: '"Clash Display", "Inter", sans-serif',
+                            fontWeight: 600
+                          }}
+                        >
+                          Today's Total Earnings
+                        </h3>
+                        <p className="text-sm" style={{ color: "#999999" }}>
+                          {dailyRevenue ? `From ${dailyRevenue.totalPrints} prints` : 'Loading...'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {revenueLoading ? (
+                      <div className="animate-spin">
+                        <RefreshCw className="w-5 h-5" style={{ color: "#FF6B35" }} />
+                      </div>
+                    ) : dailyRevenue ? (
+                      <div className="text-right">
+                        <div
+                          className="text-2xl font-bold"
+                          style={{
+                            color: "#22c55e",
+                            fontFamily: '"Clash Display", "Inter", sans-serif',
+                            fontWeight: 700
+                          }}
+                        >
+                          {formatPrice(dailyRevenue.totalRevenue)}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: "#999999" }}>
+                          <span>{dailyRevenue.bwPages} B/W</span>
+                          <span>•</span>
+                          <span>{dailyRevenue.colorPages} Color</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm" style={{ color: "#999999" }}>
+                        No data available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {dailyRevenue && (
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#FF8A50" }} />
+                          <span className="text-xs" style={{ color: "#999999" }}>B/W Revenue</span>
+                        </div>
+                        <div className="text-lg font-semibold" style={{ color: "#EAEAEA" }}>
+                          {formatPrice(dailyRevenue.breakdown.bwRevenue)}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#FF6B35" }} />
+                          <span className="text-xs" style={{ color: "#999999" }}>Color Revenue</span>
+                        </div>
+                        <div className="text-lg font-semibold" style={{ color: "#EAEAEA" }}>
+                          {formatPrice(dailyRevenue.breakdown.colorRevenue)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Search and Filter Controls */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="mb-6"
+            >
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Search */}
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: "#999999" }} />
+                  <input
+                    type="text"
+                    placeholder="Search by filename, email, name, or token..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl transition-all duration-300"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      color: "#EAEAEA",
+                      placeholderColor: "#999999"
+                    }}
+                  />
+                </div>
+                
+                {/* Filter */}
+                <div className="flex gap-2">
+                  {['all', 'B/W', 'Color'].map((type) => (
+                    <motion.button
+                      key={type}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setFilterType(type)}
+                      className="px-4 py-3 rounded-xl transition-all duration-300 text-sm font-medium"
+                      style={{
+                        background: filterType === type ? "rgba(255, 107, 53, 0.1)" : "rgba(255,255,255,0.03)",
+                        border: filterType === type ? "1px solid rgba(255, 107, 53, 0.2)" : "1px solid rgba(255,255,255,0.08)",
+                        color: filterType === type ? "#FF6B35" : "#999999"
+                      }}
+                    >
+                      {type === 'all' ? 'All Types' : type}
+                    </motion.button>
+                  ))}
+                </div>
+                
+                {/* Auto-refresh Toggle */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  className="px-4 py-3 rounded-xl transition-all duration-300 text-sm font-medium flex items-center gap-2"
+                  style={{
+                    background: autoRefreshEnabled ? "rgba(34, 197, 94, 0.1)" : "rgba(255,255,255,0.03)",
+                    border: autoRefreshEnabled ? "1px solid rgba(34, 197, 94, 0.2)" : "1px solid rgba(255,255,255,0.08)",
+                    color: autoRefreshEnabled ? "#22c55e" : "#999999"
+                  }}
+                >
+                  {autoRefreshEnabled ? (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      Auto-refresh ON
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-gray-500" />
+                      Auto-refresh OFF
+                    </>
+                  )}
+                </motion.button>
+                
+                {/* Refresh Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={fetchHistoryData}
+                  disabled={historyLoading}
+                  className="px-4 py-3 rounded-xl transition-all duration-300"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#999999"
+                  }}
+                >
+                  {historyLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </motion.button>
+              </div>
+              
+              {/* Last Refresh Time */}
+              {lastRefreshTime && (
+                <div className="flex items-center justify-between text-xs" style={{ color: "#666666" }}>
+                  <span>Last updated: {formatDateTime(lastRefreshTime)}</span>
+                  {autoRefreshEnabled && <span>Auto-refresh every 30 seconds</span>}
+                </div>
+              )}
+            </motion.div>
+
+            {/* History Table */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+            >
+              <div 
+                className="relative backdrop-blur-xl border rounded-2xl overflow-hidden"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+                }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px]"
+                  style={{ background: "linear-gradient(to right, #FF6B35, transparent)" }} />
+                
+                <div className="relative z-10 p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 rounded-lg"
+                      style={{ background: "rgba(255, 107, 53, 0.15)", border: "1px solid rgba(255, 107, 53, 0.3)" }}>
+                      <ScrollText className="w-4 h-4" style={{ color: "#FF6B35" }} />
+                    </div>
+                    <h3
+                      className="text-lg font-semibold"
+                      style={{
+                        color: "#EAEAEA",
+                        fontFamily: '"Clash Display", "Inter", sans-serif',
+                        fontWeight: 600
+                      }}
+                    >
+                      Print History ({filteredHistory.length} records)
+                    </h3>
+                  </div>
+                  
+                  {/* Table Content */}
+                  <div className="overflow-x-auto">
+                    {historyLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="flex items-center gap-3">
+                          <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "#FF6B35" }} />
+                          <span style={{ color: "#999999" }}>Loading print history...</span>
+                        </div>
+                      </div>
+                    ) : filteredHistory.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <ScrollText className="w-12 h-12 mb-4 opacity-50" style={{ color: "#999999" }} />
+                        <p className="text-lg font-medium mb-2" style={{ color: "#999999" }}>
+                          {searchTerm || filterType !== 'all' ? 'No matching records found' : 'No history available'}
+                        </p>
+                        <p className="text-sm" style={{ color: "#666666" }}>
+                          {searchTerm || filterType !== 'all' 
+                            ? 'Try adjusting your search or filter criteria' 
+                            : 'Print jobs will appear here once they are completed'
+                          }
+                        </p>
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                            <th className="text-left py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>File Name</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>User</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>Type</th>
+                            <th className="text-center py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>Copies</th>
+                            <th className="text-right py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>Price</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>Status</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium" style={{ color: "#999999" }}>Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredHistory.map((item, index) => (
+                            <tr 
+                              key={item.id}
+                              className="border-b transition-all duration-200 hover:bg-opacity-50"
+                              style={{ 
+                                borderColor: "rgba(255,255,255,0.05)",
+                                background: index % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent"
+                              }}
+                            >
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <File className="w-4 h-4" style={{ color: "#999999" }} />
+                                  <div>
+                                    <div className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                      {item.filename}
+                                    </div>
+                                    <div className="text-xs" style={{ color: "#666666" }}>
+                                      {item.token}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4" style={{ color: "#999999" }} />
+                                  <div>
+                                    <div className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                      {item.userName}
+                                    </div>
+                                    <div className="text-xs" style={{ color: "#666666" }}>
+                                      {item.userEmail}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: getPrintTypeColor(item.printType) }}
+                                  />
+                                  <span 
+                                    className="text-sm font-medium"
+                                    style={{ color: getPrintTypeColor(item.printType) }}
+                                  >
+                                    {item.printType}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                  {item.copies}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="text-sm font-semibold" style={{ color: "#22c55e" }}>
+                                  {formatPrice(item.price)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: getStatusColor(item.status) }}
+                                  />
+                                  <span 
+                                    className="text-sm font-medium"
+                                    style={{ color: getStatusColor(item.status) }}
+                                  >
+                                    {item.status}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="text-xs" style={{ color: "#999999" }}>
+                                  {formatDateTime(item.timestamp)}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
         )}
       </div>
     </div>

@@ -216,7 +216,7 @@ async function simulatePrint(req, res) {
 async function getAllDocuments(req, res) {
   try {
     const documents = await Document.find({})
-      .select('token fileUrl type status createdAt expiresAt userId')
+      .select('token fileUrl type status createdAt expiresAt userId copies')
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .lean();
@@ -371,6 +371,133 @@ async function verifyToken(req, res) {
   }
 }
 
+// Get print history with pricing
+async function getPrintHistory(req, res) {
+  try {
+    console.log('📄 Fetching print history...');
+    
+    // Get all completed prints (from logs) with document details
+    const printLogs = await Log.find({})
+      .select('token adminId time')
+      .sort({ time: -1 })
+      .lean();
+    
+    // Get document details for each print log
+    const history = [];
+    
+    for (const log of printLogs) {
+      try {
+        const doc = await Document.findOne({ token: log.token })
+          .select('fileUrl type copies createdAt userId')
+          .populate('userId', 'name email')
+          .lean();
+        
+        if (doc) {
+          // Calculate pricing
+          let price = 0;
+          if (doc.type === 'B/W') {
+            price = doc.copies * 2; // ₹2 per page for B/W
+          } else if (doc.type === 'Color') {
+            price = doc.copies * 5; // ₹5 per page for Color
+          }
+          
+          // Extract filename from fileUrl
+          const filename = doc.fileUrl ? doc.fileUrl.split('/').pop() : 'unknown';
+          
+          history.push({
+            id: log._id,
+            token: log.token,
+            filename: filename,
+            userEmail: doc.userId?.email || 'Unknown',
+            userName: doc.userId?.name || 'Unknown',
+            printType: doc.type,
+            copies: doc.copies,
+            pages: doc.copies, // Assuming copies = pages for now
+            price: price,
+            currency: '₹',
+            timestamp: log.time,
+            status: 'Printed', // All logs are completed prints
+            uploadedAt: doc.createdAt,
+            printedAt: log.time,
+            adminId: log.adminId
+          });
+        }
+      } catch (err) {
+        console.error(`Error fetching document for token ${log.token}:`, err);
+        // Continue with next log even if document fetch fails
+      }
+    }
+    
+    console.log(`✅ Found ${history.length} print history records`);
+    return res.status(200).json(history);
+  } catch (err) {
+    console.error('❌ Failed to fetch print history:', err);
+    return res.status(500).json({ message: "Failed to fetch print history.", error: err.message });
+  }
+}
+
+// Get daily revenue statistics
+async function getDailyRevenue(req, res) {
+  try {
+    console.log('💰 Calculating daily revenue...');
+    
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    
+    // Get today's print logs
+    const todayLogs = await Log.find({
+      time: { $gte: startOfDay, $lt: endOfDay }
+    }).select('token').lean();
+    
+    let totalRevenue = 0;
+    let bwPages = 0;
+    let colorPages = 0;
+    let totalPrints = 0;
+    
+    // Calculate revenue for today's prints
+    for (const log of todayLogs) {
+      try {
+        const doc = await Document.findOne({ token: log.token })
+          .select('type copies')
+          .lean();
+        
+        if (doc) {
+          totalPrints++;
+          if (doc.type === 'B/W') {
+            bwPages += doc.copies;
+            totalRevenue += doc.copies * 2;
+          } else if (doc.type === 'Color') {
+            colorPages += doc.copies;
+            totalRevenue += doc.copies * 5;
+          }
+        }
+      } catch (err) {
+        console.error(`Error calculating revenue for token ${log.token}:`, err);
+      }
+    }
+    
+    const revenueData = {
+      date: today.toISOString().split('T')[0],
+      totalRevenue,
+      totalPrints,
+      bwPages,
+      colorPages,
+      currency: '₹',
+      breakdown: {
+        bwRevenue: bwPages * 2,
+        colorRevenue: colorPages * 5
+      }
+    };
+    
+    console.log(`✅ Today's revenue: ₹${totalRevenue} from ${totalPrints} prints`);
+    return res.status(200).json(revenueData);
+  } catch (err) {
+    console.error('❌ Failed to calculate daily revenue:', err);
+    return res.status(500).json({ message: "Failed to calculate daily revenue.", error: err.message });
+  }
+}
+
 module.exports = {
   uploadDocument,
   getDocumentByToken,
@@ -378,5 +505,7 @@ module.exports = {
   simulatePrint,
   getAllDocuments,
   getAllTokens,
-  getRecentActivity
+  getRecentActivity,
+  getPrintHistory,
+  getDailyRevenue
 };

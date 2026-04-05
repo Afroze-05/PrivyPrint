@@ -1,9 +1,15 @@
 import { useEffect, useState, useMemo } from "react";
-import { Clock, FileText, Printer, CheckCircle, XCircle, Hourglass, RefreshCw } from "lucide-react";
+import { Clock, FileText, Printer, CheckCircle, XCircle, Hourglass, RefreshCw, TrendingUp, IndianRupee, Calendar, Filter } from "lucide-react";
 import { api } from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ── Premium Glass Card ── */
+/* ── Pricing Constants ── */
+const PRICING = {
+  'B/W': 2,  // ₹2 per page
+  'Color': 5  // ₹5 per page
+};
+
+/* ── Glass Card ── */
 const GlassCard = ({ children, className = "", accent = "#FF6B35" }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -51,6 +57,11 @@ const HistoryItem = ({ item, index }) => {
     }
   };
 
+  const calculatePrice = (type, copies) => {
+    const pricePerPage = PRICING[type] || 0;
+    return pricePerPage * copies;
+  };
+
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -60,10 +71,18 @@ const HistoryItem = ({ item, index }) => {
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     
-    const diffHours = Math.floor(diffMins / 60);
+    const diffHours = Math.floor(diffMs / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
     
     return date.toLocaleDateString();
+  };
+
+  const formatDate = (timestamp) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    });
   };
 
   return (
@@ -114,6 +133,20 @@ const HistoryItem = ({ item, index }) => {
               {item.userId.name}
             </span>
           )}
+          <span>
+            {item.copies} {item.copies === 1 ? 'copy' : 'copies'}
+          </span>
+        </div>
+      </div>
+
+      {/* Price */}
+      <div className="flex-shrink-0 text-right">
+        <div className="text-lg font-bold" style={{ color: "#22c55e" }}>
+          <IndianRupee className="w-4 h-4 inline mr-1" />
+          {calculatePrice(item.type, item.copies)}
+        </div>
+        <div className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+          {item.copies} × {PRICING[item.type] || 0}
         </div>
       </div>
 
@@ -136,6 +169,20 @@ export default function PrintHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [filter, setFilter] = useState("all"); // all, today, completed, pending
+
+  // Calculate today's revenue
+  const todayRevenue = useMemo(() => {
+    const today = new Date().toDateString();
+    const todayItems = history.filter(item => 
+      new Date(item.createdAt).toDateString() === today
+    );
+    
+    return todayItems.reduce((total, item) => {
+      const pricePerPage = PRICING[item.type] || 0;
+      return total + (pricePerPage * item.copies);
+    }, 0);
+  }, [history]);
 
   // Fetch history data
   const fetchHistory = async () => {
@@ -151,6 +198,24 @@ export default function PrintHistory() {
       setLoading(false);
     }
   };
+
+  // Filter history based on selected filter
+  const filteredHistory = useMemo(() => {
+    const today = new Date().toDateString();
+    
+    switch (filter) {
+      case "today":
+        return history.filter(item => 
+          new Date(item.createdAt).toDateString() === today
+        );
+      case "completed":
+        return history.filter(item => item.status === "completed");
+      case "pending":
+        return history.filter(item => item.status === "waiting" || item.status === "printing");
+      default:
+        return history;
+    }
+  }, [history, filter]);
 
   // Initial fetch
   useEffect(() => {
@@ -168,23 +233,66 @@ export default function PrintHistory() {
 
   // Sort history by creation time (newest first)
   const sortedHistory = useMemo(() => {
-    return [...history].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [history]);
+    return [...filteredHistory].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [filteredHistory]);
 
   return (
     <GlassCard accent="#FF6B35" className="h-full">
       <div className="p-6 h-full flex flex-col">
-        {/* Header */}
+        {/* Header with Revenue */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold flex items-center gap-3" style={{
-            color: "#EAEAEA",
-            fontFamily: '"Clash Display", "Inter", sans-serif'
-          }}>
-            <Clock className="w-5 h-5" />
-            Print History
-          </h2>
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold flex items-center gap-3 mb-3" style={{
+              color: "#EAEAEA",
+              fontFamily: '"Clash Display", "Inter", sans-serif'
+            }}>
+              <Clock className="w-5 h-5" />
+              Print History
+            </h2>
+            
+            {/* Today's Revenue */}
+            <div className="flex items-center gap-3 p-3 rounded-xl backdrop-blur-sm border" style={{
+              background: "rgba(34, 197, 94, 0.1)",
+              borderColor: "rgba(34, 197, 94, 0.2)"
+            }}>
+              <TrendingUp className="w-5 h-5" style={{ color: "#22c55e" }} />
+              <div>
+                <div className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Today's Total Earnings
+                </div>
+                <div className="text-xl font-bold flex items-center" style={{ 
+                  color: "#22c55e",
+                  fontFamily: '"Clash Display", "Inter", sans-serif'
+                }}>
+                  <IndianRupee className="w-5 h-5 mr-1" />
+                  {todayRevenue}
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div className="flex items-center gap-2">
+            {/* Filter Dropdown */}
+            <div className="relative">
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="px-3 py-2 rounded-lg backdrop-blur-sm border text-sm appearance-none cursor-pointer"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  borderColor: "rgba(255,255,255,0.1)",
+                  color: "#EAEAEA",
+                  fontFamily: '"Inter", sans-serif'
+                }}
+              >
+                <option value="all">All</option>
+                <option value="today">Today</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+              </select>
+              <Filter className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "rgba(255,255,255,0.5)" }} />
+            </div>
+            
             {lastUpdate && (
               <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
                 Updated {lastUpdate.toLocaleTimeString()}
@@ -229,7 +337,7 @@ export default function PrintHistory() {
               <div className="text-center">
                 <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: "rgba(255,255,255,0.3)" }} />
                 <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
-                  No print history yet
+                  {filter === "all" ? "No print history yet" : `No ${filter} print jobs found`}
                 </p>
               </div>
             </div>
