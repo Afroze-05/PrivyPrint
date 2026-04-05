@@ -12,6 +12,7 @@ const statsRoutes = require("./routes/statsRoutes");
 const logsRoutes = require("./routes/logsRoutes");
 const testRoutes = require("./routes/testRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const ratingRoutes = require("./routes/ratingRoutes");
 
 const app = express();
 
@@ -71,6 +72,7 @@ try {
   const logsRoutes = require("./routes/logsRoutes");
   const testRoutes = require("./routes/testRoutes");
   const adminRoutes = require("./routes/adminRoutes");
+  const ratingRoutes = require("./routes/ratingRoutes");
   
   app.use("/api/auth", authRoutes);
   app.use("/api", documentRoutes);
@@ -79,6 +81,7 @@ try {
   app.use("/api", logsRoutes);
   app.use("/api/test", testRoutes);
   app.use("/api", adminRoutes);
+  app.use("/api/rate", ratingRoutes);
   console.log("🔧 All routes registered");
 } catch (error) {
   console.error("❌ Error loading routes:", error);

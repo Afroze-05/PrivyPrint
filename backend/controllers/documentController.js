@@ -1,6 +1,7 @@
 const Document = require("../models/Document");
 const Log = require("../models/Log");
 const { generateToken } = require("../utils/tokenGenerator");
+const sendEmail = require("../utils/sendEmail");
 
 const DOCUMENT_TYPE_NORMALIZATION = {
   bw: "B/W",
@@ -150,6 +151,218 @@ async function getDocumentByToken(req, res) {
   }
 }
 
+async function sendPrintSuccessEmail(document) {
+  try {
+    // Get the frontend URL from environment or use default
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    // Generate rating links for each star
+    const ratingLinks = [];
+    for (let i = 1; i <= 5; i++) {
+      ratingLinks.push(`${frontendUrl}/api/rate?jobId=${document._id}&rating=${i}`);
+    }
+
+    const emailContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Print is Complete!</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px; 
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%); 
+            color: white; 
+            padding: 40px 30px; 
+            text-align: center; 
+        }
+        .header h1 { 
+            font-size: 28px; 
+            margin-bottom: 10px; 
+            font-weight: 600;
+        }
+        .header p { 
+            font-size: 16px; 
+            opacity: 0.9;
+        }
+        .content { 
+            padding: 40px 30px; 
+        }
+        .greeting { 
+            font-size: 18px; 
+            margin-bottom: 20px; 
+            color: #555;
+        }
+        .message { 
+            font-size: 16px; 
+            margin-bottom: 30px; 
+            line-height: 1.7;
+        }
+        .document-info { 
+            background: #f8f9fa; 
+            padding: 25px; 
+            border-radius: 8px; 
+            margin: 25px 0;
+            border-left: 4px solid #FF6B35;
+        }
+        .document-info h3 { 
+            color: #333; 
+            margin-bottom: 15px; 
+            font-size: 18px;
+        }
+        .document-info p { 
+            margin: 8px 0; 
+            font-size: 14px;
+        }
+        .document-info strong { 
+            color: #FF6B35; 
+        }
+        .rating-section { 
+            text-align: center; 
+            margin: 40px 0; 
+            padding: 30px;
+            background: linear-gradient(135deg, #fff8f3 0%, #fff 100%);
+            border-radius: 12px;
+            border: 1px solid #ffe5d6;
+        }
+        .rating-section h3 { 
+            color: #333; 
+            margin-bottom: 10px; 
+            font-size: 20px;
+        }
+        .rating-section p { 
+            color: #666; 
+            margin-bottom: 25px; 
+            font-size: 15px;
+        }
+        .stars-container { 
+            display: flex; 
+            justify-content: center; 
+            gap: 8px; 
+            margin: 20px 0;
+        }
+        .star { 
+            font-size: 40px; 
+            color: #ddd; 
+            text-decoration: none; 
+            transition: all 0.3s ease;
+            display: inline-block;
+            transform: scale(1);
+        }
+        .star:hover { 
+            color: #ffd700; 
+            transform: scale(1.2);
+            filter: drop-shadow(0 2px 8px rgba(255,215,0,0.4));
+        }
+        .rating-hint { 
+            font-size: 12px; 
+            color: #888; 
+            margin-top: 15px;
+            font-style: italic;
+        }
+        .footer { 
+            text-align: center; 
+            padding: 30px; 
+            color: #666; 
+            font-size: 13px; 
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+        }
+        .footer p { 
+            margin: 5px 0;
+        }
+        .brand-name { 
+            font-weight: bold; 
+            color: #FF6B35;
+        }
+        @media (max-width: 600px) {
+            .container { margin: 10px; }
+            .header { padding: 30px 20px; }
+            .content { padding: 30px 20px; }
+            .star { font-size: 35px; }
+            .stars-container { gap: 5px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Your Print is Complete!</h1>
+            <p>Your document has been successfully printed and is ready for collection</p>
+        </div>
+        <div class="content">
+            <p class="greeting">Dear ${document.userId?.name || 'Valued Customer'},</p>
+            <p class="message">
+                Great news! Your document has been successfully printed and is ready for collection. 
+                We appreciate your trust in PrivyPrint for your printing needs.
+            </p>
+            
+            <div class="document-info">
+                <h3>📄 Document Details</h3>
+                <p><strong>Document:</strong> ${document.fileUrl ? document.fileUrl.split('/').pop() : 'N/A'}</p>
+                <p><strong>Type:</strong> ${document.type}</p>
+                <p><strong>Copies:</strong> ${document.copies}</p>
+                <p><strong>Token:</strong> ${document.token}</p>
+                <p><strong>Completed:</strong> ${new Date().toLocaleString()}</p>
+            </div>
+            
+            <div class="rating-section">
+                <h3>⭐ Rate Your Experience</h3>
+                <p>Your feedback helps us serve you better! How was your printing experience?</p>
+                <div class="stars-container">
+                    <a href="${ratingLinks[0]}" class="star" title="Poor">⭐</a>
+                    <a href="${ratingLinks[1]}" class="star" title="Fair">⭐</a>
+                    <a href="${ratingLinks[2]}" class="star" title="Good">⭐</a>
+                    <a href="${ratingLinks[3]}" class="star" title="Very Good">⭐</a>
+                    <a href="${ratingLinks[4]}" class="star" title="Excellent">⭐</a>
+                </div>
+                <p class="rating-hint">Click on the stars to rate (Poor = 1 star, Excellent = 5 stars)</p>
+            </div>
+            
+            <p class="message">
+                Thank you for choosing PrivyPrint! We look forward to serving you again.
+            </p>
+        </div>
+        <div class="footer">
+            <p><span class="brand-name">PrivyPrint</span> - Your Trusted Printing Partner</p>
+            <p>If you didn't request this print, please contact us immediately.</p>
+            <p>© 2024 PrivyPrint. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+    await sendEmail({
+      email: document.userId?.email,
+      subject: "Your print has been completed successfully 🎉",
+      message: emailContent
+    });
+
+    console.log(`📧 Print success email sent to ${document.userId?.email}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send print success email:', error);
+    // Don't throw error - print process should continue even if email fails
+    return false;
+  }
+}
+
 async function simulatePrint(req, res) {
   try {
     const { token } = req.params;
@@ -192,7 +405,7 @@ async function simulatePrint(req, res) {
       { token, status: "printing" },
       { $set: { status: "completed" } },
       { new: true }
-    );
+    ).populate('userId', 'name email');
 
     if (!completedDoc) {
       return res.status(409).json({ message: "Print simulation failed due to state change." });
@@ -201,6 +414,9 @@ async function simulatePrint(req, res) {
     await Log.create({ token, adminId, time: new Date() });
     
     console.log(`✅ Print completed - Token ${token} marked as used`);
+
+    // Send print success email with rating links
+    await sendPrintSuccessEmail(completedDoc);
 
     return res.status(200).json({
       message: "Printing completed.",

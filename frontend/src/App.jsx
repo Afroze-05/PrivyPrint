@@ -14,6 +14,7 @@ import AdminVerifyOtp from "./pages/Admin/AdminVerifyOtp";
 import PrintLogsPage from "./pages/Admin/PrintLogsPage";
 import RequireAuth from "./components/RequireAuth";
 import VerifyOtp from "./pages/VerifyOtp"; // Added back
+import RatingThankYou from "./pages/RatingThankYou";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
 import "./App.css";
@@ -45,6 +46,7 @@ function App() {
           />
           <Route path="/token" element={<TokenPage />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/rating-thank-you" element={<RatingThankYou />} />
 
           {/* Admin flow (merged with Afroze's dashboard routes) */}
           <Route path="/admin/signup" element={<AdminSignup />} />

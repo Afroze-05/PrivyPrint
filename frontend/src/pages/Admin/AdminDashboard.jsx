@@ -13,7 +13,7 @@ import {
   Search, Filter, Settings, Bell, TrendingUp,
   FileText, Activity, Clock, CheckCircle, AlertCircle,
   Calendar as CalendarIcon, RefreshCw, Download, Eye,
-  IndianRupee, TrendingDown, User, File
+  IndianRupee, TrendingDown, User, File, Star
 } from "lucide-react";
 // import CalendarView from "../../components/CalendarView";
 
@@ -61,6 +61,28 @@ const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
     }}
   />
 );
+
+/* ── Star Rating Display Component ── */
+const StarRatingDisplay = ({ rating, size = "text-sm" }) => {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 !== 0;
+  
+  return (
+    <div className={`flex items-center gap-1 ${size}`}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`w-4 h-4 ${
+            star <= fullStars 
+              ? 'text-yellow-400 fill-yellow-400' 
+              : 'text-gray-600'
+          }`}
+        />
+      ))}
+      <span className="ml-1 text-gray-300">{rating.toFixed(1)}</span>
+    </div>
+  );
+};
 
 /* ── Premium Stat Card ── */
 const StatCard = ({ icon: Icon, label, value, accent = "#FF6B35", delay = 0, children, trend }) => (
@@ -186,6 +208,14 @@ export default function AdminDashboard() {
   const [filterType, setFilterType] = useState('all'); // 'all', 'B/W', 'Color'
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  
+  // Rating stats state
+  const [ratingStats, setRatingStats] = useState(null);
+  const [ratingStatsLoading, setRatingStatsLoading] = useState(false);
+  
+  // Review log state
+  const [reviewLog, setReviewLog] = useState([]);
+  const [reviewLogLoading, setReviewLogLoading] = useState(false);
 
   // Error boundary
   if (componentError) {
@@ -297,13 +327,61 @@ export default function AdminDashboard() {
     }
   }
 
+  // Fetch rating statistics
+  async function fetchRatingStats() {
+    setRatingStatsLoading(true);
+    try {
+      // TEMPORARY: Use test token for dashboard testing
+      const testToken = "test_admin_token_1775028546379";
+      const res = await api.get("/rate/stats", { 
+        headers: { Authorization: `Bearer ${testToken}` } 
+      });
+      
+      setRatingStats(res.data);
+      console.log('Rating stats loaded:', res.data);
+    } catch (err) {
+      console.error('Failed to fetch rating stats:', err);
+      setRatingStats(null);
+    } finally {
+      setRatingStatsLoading(false);
+    }
+  }
+
+  // Fetch review log
+  async function fetchReviewLog() {
+    setReviewLogLoading(true);
+    try {
+      // TEMPORARY: Use test token for dashboard testing
+      const testToken = "test_admin_token_1775028546379";
+      const res = await api.get("/rate/reviews", { 
+        headers: { Authorization: `Bearer ${testToken}` } 
+      });
+      
+      setReviewLog(res.data.ratings || []);
+      console.log('Review log loaded:', res.data.ratings);
+    } catch (err) {
+      console.error('Failed to fetch review log:', err);
+      setReviewLog([]);
+    } finally {
+      setReviewLogLoading(false);
+    }
+  }
+
   // Real-time polling effect
   useEffect(() => {
     fetchChartData(); // Initial fetch
+    fetchRatingStats(); // Initial fetch for rating stats
+    fetchReviewLog(); // Initial fetch for review log
     
     const interval = setInterval(fetchChartData, 10000); // Poll every 10 seconds
+    const ratingInterval = setInterval(fetchRatingStats, 30000); // Poll rating stats every 30 seconds
+    const reviewInterval = setInterval(fetchReviewLog, 60000); // Poll review log every 60 seconds
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(ratingInterval);
+      clearInterval(reviewInterval);
+    };
   }, []);
 
   // Fetch print history and revenue
@@ -695,7 +773,26 @@ export default function AdminDashboard() {
                 value={trustScore}
                 accent="#FF6B35"
                 delay={0.4}
-              />
+              >
+                {ratingStats && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ color: "#999999" }}>
+                        Avg Rating
+                      </span>
+                      <StarRatingDisplay rating={ratingStats.averageRating || 0} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ color: "#999999" }}>
+                        Total Ratings
+                      </span>
+                      <span className="text-xs font-medium" style={{ color: "#EAEAEA" }}>
+                        {ratingStats.totalRatings || 0}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </StatCard>
             </div>
 
             {/* Charts Section */}
@@ -879,6 +976,157 @@ export default function AdminDashboard() {
                       <div className="text-center" style={{ color: "#999999" }}>
                         <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p className="text-sm">No recent activity</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+
+              {/* Rating Distribution Panel */}
+              <Panel title="Customer Ratings" icon={Star} accent="#FFD700" delay={0.9}>
+                <div className="w-full h-[300px] min-h-[250px] flex-1 min-w-0">
+                  {ratingStatsLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="flex items-center gap-3">
+                        <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "#FF6B35" }} />
+                        <span style={{ color: "#999999" }}>Loading rating data...</span>
+                      </div>
+                    </div>
+                  ) : ratingStats && ratingStats.totalRatings > 0 ? (
+                    <div className="space-y-4">
+                      {/* Average Rating Display */}
+                      <div className="text-center p-4 rounded-xl" style={{ background: "rgba(255,215,0,0.1)" }}>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <StarRatingDisplay rating={ratingStats.averageRating} size="text-lg" />
+                        </div>
+                        <div className="text-2xl font-bold" style={{ color: "#FFD700" }}>
+                          {ratingStats.averageRating.toFixed(1)}
+                        </div>
+                        <div className="text-sm" style={{ color: "#999999" }}>
+                          Trust Score: {ratingStats.trustScore}
+                        </div>
+                      </div>
+                      
+                      {/* Rating Distribution */}
+                      <div className="space-y-2">
+                        {[5, 4, 3, 2, 1].map((star) => {
+                          const count = ratingStats.ratingDistribution[star] || 0;
+                          const percentage = ratingStats.totalRatings > 0 
+                            ? (count / ratingStats.totalRatings) * 100 
+                            : 0;
+                          
+                          return (
+                            <div key={star} className="flex items-center gap-3">
+                              <div className="flex items-center gap-1 w-12">
+                                <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                                <span className="text-sm" style={{ color: "#999999" }}>{star}</span>
+                              </div>
+                              <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                                <div 
+                                  className="h-full rounded-full transition-all duration-500"
+                                  style={{ 
+                                    width: `${percentage}%`,
+                                    background: star >= 4 ? "#22c55e" : star >= 3 ? "#FFA05B" : "#ef4444"
+                                  }}
+                                />
+                              </div>
+                              <div className="w-12 text-right">
+                                <span className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                  {count}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <div className="pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm" style={{ color: "#999999" }}>Total Ratings</span>
+                          <span className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                            {ratingStats.totalRatings}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <Star className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No ratings available yet</p>
+                        <p className="text-xs mt-2">Customer ratings will appear here</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+
+              {/* Review Log Panel */}
+              <Panel title="Customer Reviews" icon={Star} accent="#FFD700" delay={1.0}>
+                <div className="w-full h-[400px] min-h-[350px] flex-1 min-w-0">
+                  {reviewLogLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="flex items-center gap-3">
+                        <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "#FF6B35" }} />
+                        <span style={{ color: "#999999" }}>Loading reviews...</span>
+                      </div>
+                    </div>
+                  ) : reviewLog.length > 0 ? (
+                    <div className="h-full overflow-y-auto">
+                      <div className="space-y-3">
+                        {reviewLog.map((review, index) => (
+                          <div key={review._id || index} className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium" style={{ background: "rgba(255,107,53,0.2)", color: "#FF6B35" }}>
+                                  {review.userId?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium" style={{ color: "#EAEAEA" }}>
+                                    {review.userId?.name || 'Unknown User'}
+                                  </div>
+                                  <div className="text-xs" style={{ color: "#999999" }}>
+                                    {review.userId?.email || 'No email'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {[1,2,3,4,5].map(star => (
+                                  <Star 
+                                    key={star} 
+                                    className={`w-3 h-3 ${star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}`} 
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs" style={{ color: "#666" }}>
+                              <span>Job: {review.jobId?.token || 'N/A'}</span>
+                              <span>{new Date(review.timestamp).toLocaleString()}</span>
+                            </div>
+                            {review.feedback && (
+                              <div className="mt-2 text-xs" style={{ color: "#999999", fontStyle: "italic" }}>
+                                "{review.feedback}"
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+                        <div className="flex items-center justify-between text-sm">
+                          <span style={{ color: "#999999" }}>Showing latest {reviewLog.length} reviews</span>
+                          <button className="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105" style={{ background: "rgba(255,107,53,0.1)", color: "#FF6B35" }}>
+                            View All Reviews
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center" style={{ color: "#999999" }}>
+                        <Star className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-sm">No customer reviews yet</p>
+                        <p className="text-xs mt-2">Customer reviews will appear here once ratings are submitted</p>
                       </div>
                     </div>
                   )}
