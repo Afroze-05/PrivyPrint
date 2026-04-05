@@ -19,7 +19,7 @@ export default function CustomerLogin() {
     try {
       const res = await api.post("/auth/login", { email, password });
       const { token, user } = res.data;
-      setAuth({ token, ...user });
+      setAuth({ token, user });
       navigate("/upload");
     } catch (err) {
       console.log("Login error:", err.response?.data || err.message);
