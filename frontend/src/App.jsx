@@ -17,6 +17,8 @@ import VerifyOtp from "./pages/VerifyOtp"; // Added back
 import RatingThankYou from "./pages/RatingThankYou";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
+import VoicePrint from "./pages/VoicePrint";
+import VoiceRequestsPage from "./pages/Admin/VoiceRequestsPage";
 import "./App.css";
 import "./theme.css";
 
@@ -26,6 +28,14 @@ function App() {
       <Router>
         <ThemeToggle />
         <Routes>
+          <Route
+            path="/admin/voice-requests"
+            element={
+              <RequireAuth roles={["admin"]}>
+                <VoiceRequestsPage />
+              </RequireAuth>
+            }
+          />
           {/* Core Landing & Selection */}
           <Route path="/" element={<Landing />} />
           <Route path="/login-selection" element={<LoginSelection />} />
@@ -44,6 +54,7 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route path="/voice-print" element={<VoicePrint />} />
           <Route path="/token" element={<TokenPage />} />
           <Route path="/home" element={<Home />} />
           <Route path="/rating-thank-you" element={<RatingThankYou />} />
