@@ -60,7 +60,7 @@ const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
 /* ── Scan-line sweep ── */
 const ScanLine = () => (
   <motion.div
-    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF6B35]/25 to-transparent pointer-events-none z-10"
+    className="absolute left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-[#FF6B35]/25 to-transparent pointer-events-none z-10"
     animate={{ top: ["0%", "100%"] }}
     transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
   />
@@ -121,7 +121,7 @@ const Countdown = () => {
           {mm}:{ss}
         </span>
       </div>
-      <div className="h-[4px] bg-white/6 overflow-hidden">
+      <div className="h-1 bg-white/6 overflow-hidden">
         <motion.div
           className="h-full"
           style={{
@@ -284,7 +284,7 @@ export default function TokenPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 onClick={() => window.print()}
-                className="w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm bg-gradient-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-2 rounded-lg"
+                className="w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm bg-linear-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-2 rounded-lg"
               >
                 <Download className="w-4 h-4" /> Download Slip
               </motion.button>

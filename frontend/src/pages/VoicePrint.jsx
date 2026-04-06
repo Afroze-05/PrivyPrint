@@ -10,7 +10,7 @@ const VoicePrint = () => {
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
   const recognitionRef = useRef(null);
-
+  console.log(motion);
   // Matches both numeric "4582" AND alphanumeric "copama3"
   // Looks for the word token/number/id followed by the actual token value
   const parseToken = (text) => {
@@ -69,8 +69,6 @@ const VoicePrint = () => {
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setStatus("error");
-      setMessage("Web Speech API not supported. Please use Chrome or Edge.");
       return;
     }
 
@@ -81,7 +79,7 @@ const VoicePrint = () => {
 
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript;
-      setTranscript(text); // ✅ shows on screen immediately
+      setTranscript(text); //  shows on screen immediately
       handleVoiceCommand(text);
     };
 
@@ -106,6 +104,18 @@ const VoicePrint = () => {
       recognition.abort();
     };
   }, [handleVoiceCommand]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setTimeout(() => {
+        setStatus("error");
+        setMessage("Web Speech API not supported. Please use Chrome or Edge.");
+      }, 0);
+    }
+  }, []);
 
   const startListening = () => {
     if (!recognitionRef.current) {
@@ -215,7 +225,7 @@ const VoicePrint = () => {
 
         {/* Transcript box — always visible, fills in after stop */}
         <div
-          className="w-full rounded-xl border p-4 min-h-[80px] flex items-center justify-center"
+          className="w-full rounded-xl border p-4 min-h-20 flex items-center justify-center"
           style={{
             background: "rgba(255,255,255,0.03)",
             border: "1px solid rgba(255,255,255,0.08)",

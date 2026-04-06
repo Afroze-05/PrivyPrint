@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Mic, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { getAuth } from "../../services/authStorage";
-
+console.log("VoiceRequestsPage loaded", motion);
 export default function VoiceRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
