@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mic, MicOff, ArrowLeft, Loader2 } from "lucide-react";
+import { api } from "../services/api";
 
 const VoicePrint = () => {
   const navigate = useNavigate();
@@ -43,24 +44,23 @@ const VoicePrint = () => {
     setMessage(`Sending request for token "${token}"…`);
 
     try {
-      const res = await fetch("http://localhost:5000/api/print", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, transcript: text }), // send full transcript too
+      const res = await api.post("/print", { 
+        token, 
+        transcript: text 
       });
 
-      const data = await res.json();
+      const data = res.data;
 
-      if (res.ok) {
+      if (res.status === 200) {
         setStatus("success");
         setMessage(data.message || `Request sent for token "${token}"!`);
       } else {
         setStatus("error");
         setMessage(data.error || "Request failed.");
       }
-    } catch {
+    } catch (err) {
       setStatus("error");
-      setMessage("Could not reach print server. Is the backend running?");
+      setMessage(err.response?.data?.error || "Could not reach print server. Is the backend running?");
     }
   }, []);
 
