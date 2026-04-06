@@ -3365,6 +3365,7 @@ export default function AdminDashboard() {
                                 "File Name",
                                 "User",
                                 "Type",
+                                "Pages",
                                 "Copies",
                                 "Price",
                                 "Status",
@@ -3372,7 +3373,7 @@ export default function AdminDashboard() {
                               ].map((h) => (
                                 <th
                                   key={h}
-                                  className={`${h === "Copies" ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
+                                  className={`${(h === "Copies" || h === "Pages") ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
                                   style={{ color: "#999999" }}
                                 >
                                   {h}
@@ -3458,6 +3459,14 @@ export default function AdminDashboard() {
                                       {item.printType}
                                     </span>
                                   </div>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <span
+                                    className="text-sm font-medium"
+                                    style={{ color: "#EAEAEA" }}
+                                  >
+                                    {item.pages}
+                                  </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
                                   <span

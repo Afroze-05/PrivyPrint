@@ -1,10 +1,9 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, authHeader } from "../services/api";
 import { getAuth } from "../services/authStorage";
 import { setCustomerToken } from "../services/customerTokenStorage";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion);
 import {
   Upload,
   Printer,
@@ -13,6 +12,8 @@ import {
   ChevronRight,
   Check,
   Mic,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ── Background Components (Noise, Grid, Orb) ── */
@@ -71,10 +72,15 @@ export default function UploadPage() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploaded, setIsUploaded] = useState(false);
-  console.log(uploadSuccess);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // ✅ NEW: Store the token to show the user
   const [generatedToken, setGeneratedToken] = useState(null);
+
+  // Debug modal state
+  useEffect(() => {
+    console.log("🔍 Modal state changed:", { showSuccessModal, isUploaded, uploadSuccess });
+  }, [showSuccessModal, isUploaded, uploadSuccess]);
 
   function handleFileDrop(e) {
     e.preventDefault();
@@ -88,6 +94,12 @@ export default function UploadPage() {
     setError("");
     setLoading(true);
     setUploadProgress(0);
+    
+    console.log("🚀 Starting upload...");
+
+    // Clear any existing timer state for fresh session
+    localStorage.removeItem('tokenTimerStart');
+    localStorage.removeItem('tokenDuration');
 
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => Math.min(prev + 10, 90));
@@ -96,6 +108,8 @@ export default function UploadPage() {
     try {
       if (!auth?.token) throw new Error("Missing authentication token.");
       if (!file) throw new Error("Please select a PDF or image file.");
+
+      console.log("📁 Uploading file:", file.name);
 
       const formData = new FormData();
       formData.append("file", file);
@@ -106,36 +120,66 @@ export default function UploadPage() {
         headers: authHeader(auth.token),
       });
 
+      console.log("✅ Upload successful!", res.data);
+      
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       // ✅ NEW: Capture token from response
       const { token, expiresAt, status } = res.data;
       setGeneratedToken(token);
+      
+      console.log("🎫 Generated token:", token);
 
       setTimeout(() => {
         setUploadSuccess(true);
         setLoading(false);
         setIsUploaded(true);
+        
+        setCustomerToken({ token, expiresAt, status: status || "waiting" });
+        localStorage.setItem("printType", type);
+        
+        console.log("💾 Token stored, showing modal...");
+        
+        // Show success modal after a short delay
+        setTimeout(() => {
+          setShowSuccessModal(true);
+          console.log("🎉 Success modal should be visible now");
+        }, 200);
       }, 500);
-
-      setCustomerToken({ token, expiresAt, status: status || "waiting" });
-      localStorage.setItem("printType", type);
-
-      // ✅ INCREASED TIMEOUT: Gives user 6 seconds to see the Voice Print prompt
-      setTimeout(() => {
-        navigate("/token");
-      }, 6000);
     } catch (err) {
       clearInterval(progressInterval);
-      setError(err?.response?.data?.message || err.message || "Upload failed.");
+      setUploadProgress(0);
+      
+      // Better error handling with specific messages
+      let errorMessage = "Upload failed. Please try again.";
+      
+      if (err?.response?.status === 413) {
+        errorMessage = "File too large. Please choose a smaller file.";
+      } else if (err?.response?.status === 400) {
+        errorMessage = "Invalid file format. Please use PDF or image files.";
+      } else if (err?.response?.status === 401) {
+        errorMessage = "Authentication expired. Please login again.";
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
+      setFile(null); // Reset file on error
+      setUploadProgress(0); // Reset progress
+      // Ensure user cannot proceed to token page on error
+      setIsUploaded(false);
+      setUploadSuccess(false);
+      setShowSuccessModal(false);
     }
   }
 
   return (
     <div
-      className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12 overflow-hidden"
+      className="relative min-h-screen overflow-hidden flex items-center justify-center"
       style={{
         background:
           "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
@@ -147,115 +191,231 @@ export default function UploadPage() {
       <GlowOrb color="#FF6B35" size={600} top="-10%" left="-5%" delay={0} />
       <GlowOrb color="#FF8A50" size={400} top="40%" left="60%" delay={3} />
 
-      {/* Back Button */}
-      <motion.button
-        onClick={() => navigate("/home")}
-        className="absolute top-8 left-8 flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-400 hover:text-[#FF6B35] transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm font-medium">Back</span>
-      </motion.button>
+      {/* Upload Form Container - Perfectly Centered */}
+      <div className="relative z-10 w-full max-w-2xl px-6 py-12">
+        {/* Back Button - Only show when not uploaded */}
+        {!isUploaded && (
+          <motion.button
+            onClick={() => navigate("/home")}
+            className="absolute -top-16 left-0 flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-400 hover:text-[#FF6B35] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm font-medium">Back</span>
+          </motion.button>
+        )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-2xl"
-      >
-        <h1 className="text-5xl md:text-7xl font-bold mb-6 text-[#EAEAEA] leading-tight">
-          Upload <span className="text-[#FF6B35]">Document</span>
-        </h1>
+        {/* Success Modal */}
+        <AnimatePresence>
+          {showSuccessModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+              onClick={() => setShowSuccessModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="bg-gradient-to-br from-gray-900 to-black border border-green-400/20 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+                    className="w-16 h-16 mx-auto mb-4 rounded-full border-2 border-green-400/30 bg-green-400/10 flex items-center justify-center"
+                  >
+                    <Check className="w-8 h-8 text-green-400" />
+                  </motion.div>
+                  
+                  <h2 className="text-2xl font-bold text-white mb-2">Upload Successful!</h2>
+                  <p className="text-gray-400 mb-6">Your document has been secured and is ready for printing.</p>
+                  
+                  <div className="space-y-3">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        console.log("🔘 View Token button clicked");
+                        setShowSuccessModal(false);
+                        console.log("📍 Navigating to token page...");
+                        navigate("/token");
+                      }}
+                      className="w-full py-3 bg-gradient-to-r from-[#FF6B35] to-[#FF8A50] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      View Token
+                    </motion.button>
+                    
+                    <button
+                      onClick={() => setShowSuccessModal(false)}
+                      className="w-full py-2 border border-white/10 text-gray-400 hover:text-white transition-all text-sm"
+                    >
+                      Stay on Upload Page
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <motion.form onSubmit={handleSubmit} className="relative">
-          <div className="relative backdrop-blur-xl border border-white/10 rounded-2xl p-8 overflow-hidden bg-white/5 shadow-2xl">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,image/*"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
+        {/* Upload Form or Success State */}
+        {isUploaded ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+            style={{
+              background: "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+            }}
+          >
+            <NoiseSVG />
+            <GridDots />
+            <GlowOrb color="#22c55e" size={600} top="-10%" left="-5%" delay={0} />
+            <GlowOrb color="#16a34a" size={400} top="40%" left="60%" delay={3} />
 
-            {/* Success State Overlay */}
-            <AnimatePresence>
-              {isUploaded && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="absolute inset-0 z-50 bg-white p-8 flex flex-col items-center justify-between text-center"
+            <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 py-12 max-w-2xl w-full">
+              {/* Success Icon */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="w-24 h-24 rounded-full border-2 border-green-400/30 bg-green-400/10 flex items-center justify-center mb-8"
+              >
+                <Check className="w-12 h-12 text-green-400" />
+              </motion.div>
+
+              {/* Success Message */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mb-10"
+              >
+                <h1 className="text-5xl md:text-7xl font-black text-white mb-4 uppercase tracking-tighter leading-tight">
+                  Upload <span className="text-green-400">Successful!</span>
+                </h1>
+                <p className="text-xl text-gray-400 mb-2">
+                  Document is secured and ready for printing
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-400/10 border border-green-400/30 rounded-full">
+                  <Check className="w-4 h-4 text-green-400" />
+                  <span className="text-sm text-green-400 font-medium">Upload Successful! Click below to continue.</span>
+                </div>
+              </motion.div>
+
+              {/* Token Display */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="w-full max-w-md"
+              >
+                <div className="p-8 border border-[#FF6B35]/20 bg-black/40 backdrop-blur-xl rounded-3xl mb-8">
+                  <div className="text-[12px] font-bold text-gray-500 uppercase tracking-widest mb-4">
+                    Your Print Token
+                  </div>
+                  <div className="text-5xl font-black text-[#FF6B35] tracking-tighter mb-6 leading-none">
+                    {generatedToken}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Token expires in 60 seconds</span>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Voice Print Option */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="w-full max-w-md"
+              >
+                <motion.button
+                  whileHover={{
+                    scale: 1.02,
+                    backgroundColor: "rgba(255, 107, 53, 0.1)",
+                  }}
+                  onClick={() => navigate("/voice-print")}
+                  className="w-full p-6 rounded-2xl border-2 border-dashed border-[#FF6B35]/30 bg-[#FF6B35]/5 flex flex-col items-center gap-4 transition-all mb-6"
                 >
-                  <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                      <Check className="w-8 h-8 text-green-600" />
-                    </div>
-                    <h3 className="text-2xl font-black text-black">
-                      SUCCESSFULLY SECURED
-                    </h3>
-                    <p className="text-gray-500 text-sm mt-1">
-                      Document is ready for printing
-                    </p>
+                  <div className="flex items-center gap-3 text-[#FF6B35]">
+                    <Mic className="w-6 h-6 animate-pulse" />
+                    <span className="font-bold text-sm uppercase tracking-widest">
+                      Try Voice Print
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-gray-500 italic">
+                    Say: "Print token {generatedToken}"
+                  </p>
+                </motion.button>
 
-                    {/* ✅ TOKEN DISPLAY */}
-                    <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-100 w-full">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        Your Print Token
-                      </span>
-                      <div className="text-4xl font-black text-[#FF6B35] tracking-tighter">
-                        {generatedToken}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => navigate("/token")}
+                  className="w-full py-5 font-black uppercase tracking-[0.4em] text-white text-lg bg-gradient-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-3 rounded-xl transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                  Proceed to Token Page
+                </motion.button>
+              </motion.div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full"
+          >
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 text-[#EAEAEA] leading-tight text-center">
+              Upload <span className="text-[#FF6B35]">Document</span>
+            </h1>
+
+            <motion.form onSubmit={handleSubmit} className="relative">
+              <div className="relative backdrop-blur-xl border border-white/10 rounded-2xl p-8 overflow-hidden bg-white/5 shadow-2xl">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+
+                {/* Error Message */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-red-400 font-medium">{error}</p>
+                        <p className="text-red-400/70 text-sm mt-1">Please try again or contact support if the issue persists.</p>
                       </div>
                     </div>
+                  </motion.div>
+                )}
+
+                {/* Progress Bar (Only during loading) */}
+                {loading && (
+                  <div className="absolute top-0 left-0 w-full h-1 bg-white/10 overflow-hidden">
+                    <motion.div
+                      className="h-full bg-[#FF6B35]"
+                      initial={{ width: "0%" }}
+                      animate={{ width: `${uploadProgress}%` }}
+                    />
                   </div>
+                )}
 
-                  {/* ✅ VOICE PRINT PROMPT */}
-                  <motion.button
-                    whileHover={{
-                      scale: 1.02,
-                      backgroundColor: "rgba(255, 107, 53, 0.1)",
-                    }}
-                    onClick={() => navigate("/voice-print")}
-                    className="w-full mt-4 p-5 rounded-2xl border-2 border-dashed border-[#FF6B35]/30 bg-[#FF6B35]/5 flex flex-col items-center gap-2 transition-all"
-                  >
-                    <div className="flex items-center gap-2 text-[#FF6B35]">
-                      <Mic className="w-5 h-5 animate-pulse" />
-                      <span className="font-bold text-sm uppercase tracking-widest">
-                        Try Voice Print
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500 italic">
-                      Say: "Print token {generatedToken}"
-                    </p>
-                  </motion.button>
-
-                  <p className="text-[10px] text-gray-400 mt-4">
-                    Redirecting to status page shortly...
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
-              >
-                {error}
-              </motion.div>
-            )}
-
-            {/* Progress Bar (Only during loading) */}
-            {loading && (
-              <div className="absolute top-0 left-0 w-full h-1 bg-white/10 overflow-hidden">
-                <motion.div
-                  className="h-full bg-[#FF6B35]"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            )}
-
-            {!isUploaded && (
-              <>
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={(e) => {
@@ -317,11 +477,11 @@ export default function UploadPage() {
                   {loading ? "Processing..." : "Secure Upload"}
                   {!loading && <ChevronRight className="w-5 h-5" />}
                 </button>
-              </>
-            )}
-          </div>
-        </motion.form>
-      </motion.div>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }

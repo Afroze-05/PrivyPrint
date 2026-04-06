@@ -6,6 +6,9 @@ const documentController = require("../controllers/documentController");
 
 const router = express.Router();
 
+// Test route for fixed APIs (temporary - remove after testing)
+router.get("/test-fixed-apis", documentController.getRealTimeStats);
+
 // Upload document (admin and customer).
 router.post(
   "/upload",
@@ -76,6 +79,9 @@ router.post("/verify-token", authMiddleware, requireRole("admin"), documentContr
 
 router.get("/document/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
 
+// Get document by ID (for rating page - accessible by authenticated users)
+router.get("/documents/:id", authMiddleware, documentController.getDocumentById);
+
 // Simulate printing flow waiting -> printing -> completed (admin only).
 router.post("/print/:token", authMiddleware, requireRole("admin"), documentController.simulatePrint);
 
@@ -84,6 +90,12 @@ router.get("/print-history", authMiddleware, requireRole("admin"), documentContr
 
 // Get daily revenue statistics (admin only).
 router.get("/daily-revenue", authMiddleware, requireRole("admin"), documentController.getDailyRevenue);
+
+// Get real-time print statistics (admin only).
+router.get("/realtime-stats", authMiddleware, requireRole("admin"), documentController.getRealTimeStats);
+
+// Get earnings history (admin only).
+router.get("/earnings-history", authMiddleware, requireRole("admin"), documentController.getEarningsHistory);
 
 console.log("🔧 documentRoutes module loaded");
 
