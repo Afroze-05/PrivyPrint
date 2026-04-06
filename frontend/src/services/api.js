@@ -33,10 +33,12 @@ api.interceptors.response.use(
   (error) => {
     console.log("API Error:", error.response?.data || error.message);
     
-    // If unauthorized, clear auth and redirect to login
+    // If unauthorized, clear auth and redirect to appropriate login
     if (error.response?.status === 401) {
       localStorage.removeItem("secureprint_auth");
-      window.location.href = "/login";
+      // Check if current path is admin-related
+      const isAdminPath = window.location.pathname.startsWith('/admin');
+      window.location.href = isAdminPath ? "/admin/login" : "/login";
     }
     
     return Promise.reject(error);

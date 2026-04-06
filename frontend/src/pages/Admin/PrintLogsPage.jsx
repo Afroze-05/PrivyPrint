@@ -269,26 +269,67 @@ export default function PrintLogsPage() {
   const [spinning, setSpinning] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [newLogCount, setNewLogCount] = useState(0);
 
-  async function loadLogs() {
-    setError("");
-    setLoading(true);
-    setSpinning(true);
+  async function loadLogs(silent = false) {
+    if (!silent) {
+      setError("");
+      setLoading(true);
+      setSpinning(true);
+    }
     try {
       const token = getAuth()?.token;
       const res = await api.get("/logs", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLogs(res.data?.logs || []);
+      const newLogs = res.data?.logs || [];
+      
+      // Check for new logs (for real-time updates)
+      if (logs.length > 0 && newLogs.length > logs.length) {
+        const newCount = newLogs.length - logs.length;
+        setNewLogCount(prev => prev + newCount);
+      }
+      
+      setLogs(newLogs);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Failed to fetch logs.");
     } finally {
-      setLoading(false);
-      setTimeout(() => setSpinning(false), 600);
+      if (!silent) {
+        setLoading(false);
+        setTimeout(() => setSpinning(false), 600);
+      }
     }
   }
 
   useEffect(() => { loadLogs(); }, []);
+
+  // Auto-refresh polling (every 3 seconds)
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      loadLogs(true); // Silent refresh for polling
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, logs.length]);
+
+  // Reset new log count when user interacts with the page
+  useEffect(() => {
+    const handleInteraction = () => setNewLogCount(0);
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('scroll', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('scroll', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
 
   // Filter and search logic
   const filteredLogs = useMemo(() => {
@@ -359,6 +400,61 @@ export default function PrintLogsPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Auto-refresh toggle */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-sm border"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                borderColor: "rgba(255,255,255,0.1)"
+              }}>
+              <div className="relative">
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`w-12 h-6 rounded-full transition-colors duration-300 relative`}
+                  style={{
+                    background: autoRefresh ? "#22c55e" : "rgba(255,255,255,0.2)"
+                  }}
+                >
+                  <motion.div
+                    animate={{ x: autoRefresh ? 24 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-lg"
+                  />
+                </button>
+              </div>
+              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+                Auto-refresh
+              </span>
+            </div>
+
+            {/* New logs notification */}
+            {newLogCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="px-3 py-2 rounded-lg border"
+                style={{
+                  background: "rgba(34,197,94,0.1)",
+                  borderColor: "rgba(34,197,94,0.2)"
+                }}
+              >
+                <span className="text-sm font-medium" style={{ color: "#22c55e" }}>
+                  {newLogCount} new log{newLogCount > 1 ? 's' : ''}
+                </span>
+              </motion.div>
+            )}
+
+            {/* Last updated indicator */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-sm border"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                borderColor: "rgba(255,255,255,0.1)"
+              }}>
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#FF6B35" }} />
+              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+                Last: {lastUpdated.toLocaleTimeString()}
+              </span>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -375,7 +471,7 @@ export default function PrintLogsPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={loadLogs}
+              onClick={() => loadLogs()}
               className="relative overflow-hidden group px-6 py-3 rounded-xl font-medium text-white transition-all duration-300"
               style={{
                 background: "linear-gradient(135deg, #FF6B35 0%, #FF6B35dd 100%)",

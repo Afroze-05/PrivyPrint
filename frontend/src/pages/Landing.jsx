@@ -263,120 +263,63 @@ function Landing() {
         </motion.div>
       </div>
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center px-6" style={{ scrollSnapAlign: "start" }}>
-        <div className="relative z-10 max-w-6xl mx-auto text-center">
-          {/* Status indicator */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="inline-flex items-center gap-3 mb-8 px-4 py-2 rounded-full"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              backdropFilter: "blur(16px)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#FF6B35"
-            }}
-          >
-            <div className="w-2 h-2 rounded-full bg-[#FF6B35] animate-pulse" />
-            <span className="text-sm font-medium">System Active</span>
-          </motion.div>
+      {/* NEW HERO SECTION (REPLACEMENT) */}
+<section className="relative min-h-screen flex items-center justify-center px-6" style={{ scrollSnapAlign: "start" }}>
 
-          {/* Premium heading */}
-          <motion.h1
-            initial={{ opacity: 0, y: 60, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="text-6xl md:text-8xl font-bold mb-6"
-            style={{
-              fontFamily: '"Inter Tight", "Inter", sans-serif',
-              color: "#EAEAEA",
-              fontWeight: 700,
-              lineHeight: 1.1
-            }}
-          >
-            <span className="block">Privy</span>
-            <motion.span
-              className="block"
-              style={{
-                background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                filter: "drop-shadow(0 0 30px rgba(255, 107, 53, 0.3))"
-              }}
-            >
-              Print
-            </motion.span>
-          </motion.h1>
+  {/* Top Left */}
+  <div className="absolute top-6 left-6 flex items-center gap-2">
+    <Cpu className="w-3 h-3 text-[var(--accent)]/40" />
+    <span className="text-[10px] tracking-[0.4em] text-[var(--text-muted)] uppercase">
+      PRIVYPRINT OS v4.2
+    </span>
+  </div>
 
-          {/* Subheading */}
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto"
-            style={{
-              fontFamily: '"Inter", sans-serif',
-              color: "#999999",
-              lineHeight: 1.6,
-              fontWeight: 400
-            }}
-          >
-            Enterprise-grade secure printing with end-to-end encryption and seamless document management
-          </motion.p>
+  {/* Top Right */}
+  <div className="absolute top-6 right-6 px-4 py-2 bg-black/40 border border-[var(--accent)]/20 text-xs tracking-widest text-[var(--accent)] uppercase">
+    SYSTEM LIVE
+  </div>
 
-          {/* Premium CTA */}
-          <motion.button
-            initial={{ opacity: 0, y: 30, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.7, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            onClick={() => navigate("/home")}
-            whileHover={{ 
-              y: -4,
-              scale: 1.02,
-              boxShadow: "0 20px 60px rgba(255, 107, 53, 0.3)",
-              transition: { duration: 0.3, ease: "easeOut" }
-            }}
-            whileTap={{ scale: 0.98 }}
-            className="group relative px-12 py-4 rounded-2xl font-semibold text-white overflow-hidden transition-all duration-300"
-            style={{
-              background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
-              fontFamily: '"Inter Tight", "Inter", sans-serif',
-              fontSize: "16px",
-              fontWeight: 600
-            }}
-          >
-            <span className="relative z-10 flex items-center gap-3">
-              Get Started
-              <ArrowRight className="w-5 h-5" />
-            </span>
-            {/* Hover overlay */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              animate={{
-                x: ["-100%", "100%"],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            />
-          </motion.button>
-        </div>
+  <div className="relative z-10 text-center">
 
-        {/* Scroll hint */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2"
-          animate={{ y: [0, 8, 0], opacity: [0.4, 0.8, 0.4] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <span className="text-xs font-medium" style={{ color: "#666666" }}>Scroll</span>
-          <ChevronDown className="w-5 h-5" style={{ color: "#666666" }} />
-        </motion.div>
-      </section>
+    {/* Badge */}
+    <div className="mb-6 px-6 py-2 border border-[var(--accent)]/20 inline-flex items-center gap-2">
+      <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse" />
+      <span className="text-xs tracking-[0.4em] text-[var(--accent)] uppercase">
+        Secure Channel Active
+      </span>
+    </div>
+
+    {/* Heading */}
+    <h1 className="text-7xl md:text-9xl font-black uppercase tracking-tight">
+      <span className="text-white">PRIVY</span>
+      <span className="text-[var(--accent)]">PRINT</span>
+    </h1>
+
+    {/* Subtitle */}
+    <p className="mt-6 text-[var(--accent)] tracking-[0.4em] uppercase text-sm opacity-70">
+      PRIVACY-PROTECTED PRINTING SYSTEM
+    </p>
+
+    {/* Line */}
+    <div className="mt-6 h-[1px] w-80 mx-auto bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent" />
+
+   <button
+  onClick={() => navigate("/home")}
+  className="mt-8 px-12 py-4 uppercase tracking-[0.3em] font-bold text-white rounded-full transition-all duration-300 hover:scale-105"
+  style={{
+    background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
+  }}
+>
+  START →
+</button>
+    {/* Scroll */}
+    <div className="mt-10 flex flex-col items-center text-white/30 text-xs">
+      <span>SCROLL</span>
+      <ChevronDown className="w-4 h-4 mt-1 animate-bounce" />
+    </div>
+
+  </div>
+</section>
 
       {/* Features Section - Stacked Card */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-24" style={{ scrollSnapAlign: "start" }}>
