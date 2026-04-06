@@ -15,7 +15,8 @@ const sendEmail = async (options) => {
     from: `PrivyPrint <${process.env.EMAIL_FROM}>`,
     to: options.email,
     subject: options.subject,
-    text: options.message,
+    text: options.textMessage || "Please view this email in an HTML-enabled email client.",
+    html: options.message,
   };
 
   await transporter.sendMail(mailOptions);

@@ -324,6 +324,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
+import { setAuth, getAuth } from "../../services/authStorage";
 import { motion } from "framer-motion";
 console.log(motion);
 import {
@@ -351,9 +352,18 @@ export default function AdminSignup() {
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
+<<<<<<< HEAD
       navigate("/verify-otp", {
         // ← Only this
         state: { email, role: "admin" },
+=======
+
+
+      navigate("/verify-otp", {
+        // ← Only this
+        state: { email, role: "admin" },
+
+>>>>>>> afroze
       });
       // Then in your VerifyOTP component, navigate to /admin/dashboard on success
     } catch (err) {

@@ -109,5 +109,145 @@ async function getPrintStats(req, res) {
   }
 }
 
-module.exports = { getStats, getPrintStats };
+async function getCharts(req, res) {
+  try {
+    const { filter = '7days' } = req.query;
+    console.log('📊 Charts request with filter:', filter);
+    
+    const now = new Date();
+    let startDate;
+    
+    switch (filter) {
+      case 'today':
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '7days':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '30days':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      default:
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Get user registration data over time
+    const usersByDay = await User.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate }
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt"
+            }
+          },
+          count: { $sum: 1 }
+        },
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get print activity over time
+    const printsByDay = await Log.aggregate([
+      {
+        $match: {
+          time: { $gte: startDate },
+          "doc.status": "completed"
+        },
+      },
+      {
+        $lookup: {
+          from: "documents",
+          localField: "token",
+          foreignField: "token",
+          as: "doc",
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$time"
+            }
+          },
+          count: { $sum: 1 }
+        },
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get upload activity over time
+    const uploadsByDay = await Log.aggregate([
+      {
+        $match: {
+          time: { $gte: startDate },
+          "doc.action": "upload"
+        },
+      },
+      {
+        $lookup: {
+          from: "documents",
+          localField: "token",
+          foreignField: "token",
+          as: "doc",
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$time"
+            }
+          },
+          count: { $sum: 1 }
+        },
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Combine data for chart
+    const combinedData = [];
+    const dayCount = filter === 'today' ? 1 : filter === '7days' ? 7 : 30;
+    console.log(`📊 Generating ${dayCount} days of data from:`, startDate);
+    
+    for (let i = 0; i < dayCount; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      const dateStr = currentDate.toISOString().slice(0, 10);
+      
+      const userDayData = usersByDay.find(u => u._id === dateStr);
+      const printDayData = printsByDay.find(p => p._id === dateStr);
+      const uploadDayData = uploadsByDay.find(u => u._id === dateStr);
+      
+      combinedData.push({
+        date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        prints: printDayData?.count || 0,
+        users: userDayData?.count || 0,
+        uploads: uploadDayData?.count || 0
+      });
+    }
+    
+    console.log('📊 Chart data generated:', combinedData.length, 'points');
+    return res.status(200).json(combinedData);
+  } catch (err) {
+    console.error("Failed to fetch chart data:", err);
+    return res.status(500).json({ message: "Failed to fetch chart data", error: err.message });
+  }
+}
+
+module.exports = { getStats, getPrintStats, getCharts };
 

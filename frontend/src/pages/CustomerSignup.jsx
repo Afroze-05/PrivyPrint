@@ -1092,7 +1092,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../services/api";
-import { setAuth } from "../services/authStorage";
+import { setAuth, getAuth } from "../services/authStorage";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Mail, Lock, ArrowRight, FileText, UserPlus } from "lucide-react";
 
