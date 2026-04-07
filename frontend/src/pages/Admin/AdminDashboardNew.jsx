@@ -6,10 +6,12 @@ import {
   Users, Printer, BarChart2, ShieldCheck,
   LogOut, LayoutDashboard, ScrollText,
   Star, Bell, Settings, Calendar as CalendarIcon,
-  TrendingUp, TrendingDown, Activity
+  TrendingUp, TrendingDown, Activity, Mic,
+  Clock, CheckCircle, AlertCircle, RefreshCw
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import RatingsSection from "../../components/admin/RatingsSection";
+import VoicePanel from "../../components/admin/VoicePanel";
 
 /* ── Premium Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -129,9 +131,60 @@ export default function AdminDashboardNew() {
   const [chartLoading, setChartLoading] = useState(false);
 
   // Active tab state
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'ratings', 'history', 'print-panel', 'logs'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'ratings', 'history', 'voice', 'print-panel', 'logs'
+
+  // Voice requests state for voice requests tab
+  const [voiceRequests, setVoiceRequests] = useState([]);
+  const [voiceRequestsLoading, setVoiceRequestsLoading] = useState(false);
 
   // Error boundary
+  const handleLogout = () => {
+    clearAuth();
+    navigate("/");
+  };
+
+  // Fetch voice requests from backend
+  async function fetchVoiceRequests() {
+    setVoiceRequestsLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/voice-requests", {
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      });
+      const data = await res.json();
+      setVoiceRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load voice requests:", err);
+      setVoiceRequests([]);
+    } finally {
+      setVoiceRequestsLoading(false);
+    }
+  }
+
+  // Update voice request status (printed / rejected)
+  async function updateVoiceRequestStatus(id, status) {
+    try {
+      await fetch(`http://localhost:5000/api/voice-requests/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+      fetchVoiceRequests();
+    } catch (err) {
+      console.error("Failed to update voice request:", err);
+    }
+  }
+
+  // Helper for voice request status badge styling
+  const getVoiceStatusStyle = (status) => {
+    if (status === "printed")
+      return { bg: "rgba(34,197,94,0.1)",  border: "rgba(34,197,94,0.3)",  text: "#22c55e" };
+    if (status === "rejected")
+      return { bg: "rgba(239,68,68,0.1)",  border: "rgba(239,68,68,0.3)",  text: "#ef4444" };
+    return   { bg: "rgba(255,107,53,0.1)", border: "rgba(255,107,53,0.3)", text: "#FF6B35" };
+  };
   if (error && !stats) {
     return (
       <div style={{ padding: "20px", color: "#fff", background: "#1a1a1a", minHeight: "100vh" }}>
@@ -202,14 +255,21 @@ export default function AdminDashboardNew() {
         bwPrints: 0,
         colorPrints: 0,
         totalEarnings: 0,
-        currency: '₹',
-        lastUpdated: new Date(),
-        breakdown: { bwEarnings: 0, colorEarnings: 0 }
+        currency: '₹'
       });
     } finally {
       setRealTimeLoading(false);
     }
   }
+
+  // Poll for voice requests when voice tab is active
+  useEffect(() => {
+    if (activeTab === 'voice') {
+      fetchVoiceRequests();
+      const interval = setInterval(fetchVoiceRequests, 15000); // Auto-refresh every 15s
+      return () => clearInterval(interval);
+    }
+  }, [activeTab]);
 
   // Load earnings history
   async function loadEarningsHistory() {
@@ -367,11 +427,6 @@ export default function AdminDashboardNew() {
     }
   }, [activeTab]);
 
-  function handleLogout() {
-    clearAuth();
-    navigate("/admin/login");
-  }
-
   const trustColor = trustScore > 60 ? "#FF6B35" : "#FF6B35";
 
   try {
@@ -472,6 +527,34 @@ export default function AdminDashboardNew() {
             <motion.button
               whileHover={{ scale: 1.02, x: 4 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => setActiveTab('voice')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+              style={{
+                background: activeTab === 'voice' ? "rgba(255, 107, 53, 0.1)" : "rgba(255,255,255,0.03)",
+                border: activeTab === 'voice' ? "1px solid rgba(255, 107, 53, 0.2)" : "1px solid rgba(255,255,255,0.08)",
+                color: activeTab === 'voice' ? "#FF6B35" : "#999999"
+              }}
+            >
+              <Mic className="w-4 h-4" />
+              <span className="text-sm font-medium">Voice Print</span>
+              {/* Live badge showing pending count */}
+              {voiceRequests.filter((r) => r.status === "pending").length > 0 && (
+                <span
+                  className="ml-auto text-[10px] font-black px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "rgba(255,107,53,0.2)",
+                    color: "#FF6B35",
+                    border: "1px solid rgba(255,107,53,0.3)",
+                  }}
+                >
+                  {voiceRequests.filter((r) => r.status === "pending").length}
+                </span>
+              )}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, x: 4 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => navigate("/admin/print")}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
               style={{
@@ -539,6 +622,7 @@ export default function AdminDashboardNew() {
               {activeTab === 'dashboard' && 'Dashboard'}
               {activeTab === 'ratings' && 'Ratings & Reviews'}
               {activeTab === 'history' && 'History'}
+              {activeTab === 'voice' && 'Voice Print'}
               {activeTab === 'print-panel' && 'Print Panel'}
               {activeTab === 'logs' && 'Print Logs'}
             </h1>
@@ -546,6 +630,7 @@ export default function AdminDashboardNew() {
               {activeTab === 'dashboard' && `Welcome back, ${auth?.name || "Admin"}`}
               {activeTab === 'ratings' && 'Manage customer ratings and feedback'}
               {activeTab === 'history' && 'Track uploads, tokens, and prints by date'}
+              {activeTab === 'voice' && 'Manage voice print requests and verify tokens'}
               {activeTab === 'print-panel' && 'Manage print jobs and tokens'}
               {activeTab === 'logs' && 'View system logs and activities'}
             </p>
@@ -895,6 +980,141 @@ export default function AdminDashboardNew() {
         )}
 
         {activeTab === 'ratings' && <RatingsSection />}
+
+        {activeTab === 'voice' && (
+          <>
+            <VoicePanel />
+            
+            {/* Voice Requests Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-6"
+            >
+              <div
+                className="relative backdrop-blur-xl border rounded-2xl overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.03)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)" }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-[1px]" style={{ background: "linear-gradient(to right, #FF6B35, transparent)" }} />
+
+                <div className="relative z-10 p-6">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ background: "rgba(255,107,53,0.15)", border: "1px solid rgba(255,107,53,0.3)" }}>
+                        <Mic className="w-4 h-4" style={{ color: "#FF6B35" }} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold" style={{ color: "#EAEAEA", fontFamily: '"Clash Display", "Inter", sans-serif', fontWeight: 600 }}>
+                          Voice Print Requests
+                        </h3>
+                        <p className="text-xs" style={{ color: "#999999" }}>
+                          {voiceRequests.filter((r) => r.status === "pending").length} pending · {voiceRequests.length} total · auto-refreshes every 15s
+                        </p>
+                      </div>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={fetchVoiceRequests}
+                      className="p-2 rounded-xl"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#999999" }}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${voiceRequestsLoading ? "animate-spin" : ""}`} />
+                    </motion.button>
+                  </div>
+
+                  {/* Body */}
+                  {voiceRequestsLoading && voiceRequests.length === 0 ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex items-center gap-3" style={{ color: "#999999" }}>
+                        <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "#FF6B35" }} />
+                        <span>Loading voice requests…</span>
+                      </div>
+                    </div>
+                  ) : voiceRequests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <Mic className="w-14 h-14 mb-4 opacity-20" style={{ color: "#FF6B35" }} />
+                      <p className="text-lg font-medium mb-2" style={{ color: "#999999" }}>No voice requests yet</p>
+                      <p className="text-sm" style={{ color: "#666666" }}>Requests appear here when customers use the Voice Print feature</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {voiceRequests.map((req) => {
+                        const s = getVoiceStatusStyle(req.status);
+                        const isPending = req.status === "pending";
+                        return (
+                          <motion.div
+                            key={req._id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-start justify-between gap-4 p-4 rounded-xl"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                          >
+                            {/* Left — token + transcript + time */}
+                            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#999999" }}>Token</span>
+                                <span className="text-lg font-black tracking-widest" style={{ color: "#EAEAEA" }}>{req.token}</span>
+                              </div>
+                              {req.transcript && (
+                                <p className="text-sm italic truncate" style={{ color: "#999999" }}>
+                                  "{req.transcript}"
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1 mt-1">
+                                <Clock className="w-3 h-3" style={{ color: "#666666" }} />
+                                <span className="text-xs" style={{ color: "#666666" }}>
+                                  {new Date(req.requestedAt).toLocaleString("en-IN", {
+                                    day: "2-digit", month: "short", year: "numeric",
+                                    hour: "2-digit", minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right — badge + actions */}
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                              <span
+                                className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full"
+                                style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}
+                              >
+                                {req.status}
+                              </span>
+                              {isPending && (
+                                <div className="flex gap-2">
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => updateVoiceRequestStatus(req._id, "printed")}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold"
+                                    style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e" }}
+                                  >
+                                    <CheckCircle className="w-3 h-3" /> Mark Printed
+                                  </motion.button>
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => updateVoiceRequestStatus(req._id, "rejected")}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold"
+                                    style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}
+                                  >
+                                    <AlertCircle className="w-3 h-3" /> Reject
+                                  </motion.button>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
 
         {activeTab === 'history' && (
           <motion.div
