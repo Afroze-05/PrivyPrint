@@ -352,18 +352,10 @@ export default function AdminSignup() {
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
-<<<<<<< HEAD
-      navigate("/verify-otp", {
-        // ← Only this
-        state: { email, role: "admin" },
-=======
-
-
       navigate("/verify-otp", {
         // ← Only this
         state: { email, role: "admin" },
 
->>>>>>> afroze
       });
       // Then in your VerifyOTP component, navigate to /admin/dashboard on success
     } catch (err) {
