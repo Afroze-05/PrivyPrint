@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, clearAuth } from "../../services/authStorage";
+import { api } from "../../services/api";
 import { motion } from "framer-motion";
 import {
   Users, Printer, BarChart2, ShieldCheck,
@@ -204,21 +205,14 @@ export default function AdminDashboardNew() {
     setError("");
     setLoading(true);
     try {
-      // TEMPORARY: Use test token for dashboard testing
-      const testToken = "test_admin_token_1775028546379";
-      const res = await fetch("/api/stats", {
-        headers: { Authorization: `Bearer ${testToken}` },
-      });
+      const api = (await import("../../services/api")).api;
+      const res = await api.get("/stats");
+      setStats(res.data);
       
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      
-      const data = await res.json();
-      setStats(data);
-      
-      if (typeof data?.trustScore === "number") {
-        setTrustScore(data.trustScore);
+      if (typeof res.data?.trustScore === "number") {
+        setTrustScore(res.data.trustScore);
         const currentAuth = getAuth();
-        const newAuth = { ...currentAuth, trustScore: data.trustScore };
+        const newAuth = { ...currentAuth, trustScore: res.data.trustScore };
         localStorage.setItem("auth", JSON.stringify(newAuth));
       }
 
@@ -368,16 +362,8 @@ export default function AdminDashboardNew() {
   async function loadChartData(filter) {
     setChartLoading(true);
     try {
-      // TEMPORARY: Use test token for dashboard testing
-      const testToken = "test_admin_token_1775028546379";
-      const res = await fetch(`/api/stats/charts?filter=${filter}`, {
-        headers: { Authorization: `Bearer ${testToken}` },
-      });
-      
-      if (!res.ok) throw new Error("Failed to fetch chart data");
-      
-      const data = await res.json();
-      setChartData(data);
+      const res = await api.get(`/stats/charts?filter=${filter}`);
+      setChartData(res.data);
     } catch (err) {
       console.error("Failed to load chart data:", err);
       // Fallback data

@@ -50,7 +50,7 @@ function App() {
           <Route
             path="/upload"
             element={
-              <RequireAuth roles={["customer"]}>
+              <RequireAuth>
                 <UploadPage />
               </RequireAuth>
             }

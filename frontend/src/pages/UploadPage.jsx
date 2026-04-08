@@ -14,6 +14,7 @@ import {
   Mic,
   Timer,
   AlertTriangle,
+  X,
 } from "lucide-react";
 
 /* ── Background Components (Noise, Grid, Orb) ── */
@@ -63,7 +64,7 @@ export default function UploadPage() {
   const auth = useMemo(() => getAuth(), []);
   const fileInputRef = useRef(null);
 
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [type, setType] = useState("B/W");
   const [copies, setCopies] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -85,8 +86,21 @@ export default function UploadPage() {
   function handleFileDrop(e) {
     e.preventDefault();
     setDragOver(false);
-    const dropped = e.dataTransfer?.files?.[0];
-    if (dropped) setFile(dropped);
+    const droppedFiles = Array.from(e.dataTransfer?.files || []);
+    if (droppedFiles.length > 0) {
+      setFiles(prevFiles => [...prevFiles, ...droppedFiles]);
+    }
+  }
+
+  function removeFile(index) {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+  }
+
+  function handleFileSelect(e) {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length > 0) {
+      setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    }
   }
 
   async function handleSubmit(e) {
@@ -95,56 +109,70 @@ export default function UploadPage() {
     setLoading(true);
     setUploadProgress(0);
     
-    console.log("🚀 Starting upload...");
+    console.log("Starting multiple file upload...");
 
     // Clear any existing timer state for fresh session
     localStorage.removeItem('tokenTimerStart');
     localStorage.removeItem('tokenDuration');
 
+    if (!auth?.token) throw new Error("Missing authentication token.");
+    if (files.length === 0) throw new Error("Please select at least one PDF or image file.");
+
     const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => Math.min(prev + 10, 90));
+      setUploadProgress((prev) => Math.min(prev + (100 / files.length) / 10, 90));
     }, 100);
 
     try {
-      if (!auth?.token) throw new Error("Missing authentication token.");
-      if (!file) throw new Error("Please select a PDF or image file.");
-
-      console.log("📁 Uploading file:", file.name);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", type);
-      formData.append("copies", String(copies));
-
-      const res = await api.post("/upload", formData, {
-        headers: authHeader(auth.token),
-      });
-
-      console.log("✅ Upload successful!", res.data);
+      // Upload files one by one
+      const uploadedTokens = [];
       
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`Uploading file ${i + 1}/${files.length}:`, file.name);
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("type", type);
+        formData.append("copies", String(copies));
+
+        const res = await api.post("/upload", formData, {
+          headers: authHeader(auth.token),
+        });
+
+        console.log(`File ${i + 1} uploaded successfully!`, res.data);
+        
+        // Store token for this file
+        const { token, expiresAt, status } = res.data;
+        uploadedTokens.push({ token, file: file.name, expiresAt, status: status || "waiting" });
+      }
+
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      // ✅ NEW: Capture token from response
-      const { token, expiresAt, status } = res.data;
-      setGeneratedToken(token);
+      // For now, use the first token as the main token (you can modify this logic later)
+      const mainToken = uploadedTokens[0];
+      setGeneratedToken(mainToken.token);
       
-      console.log("🎫 Generated token:", token);
+      console.log("All files uploaded successfully!");
 
       setTimeout(() => {
         setUploadSuccess(true);
         setLoading(false);
         setIsUploaded(true);
         
-        setCustomerToken({ token, expiresAt, status: status || "waiting" });
+        setCustomerToken({ 
+          token: mainToken.token, 
+          expiresAt: mainToken.expiresAt, 
+          status: mainToken.status 
+        });
         localStorage.setItem("printType", type);
         
-        console.log("💾 Token stored, showing modal...");
+        console.log("Tokens stored, showing modal...");
         
         // Show success modal after a short delay
         setTimeout(() => {
           setShowSuccessModal(true);
-          console.log("🎉 Success modal should be visible now");
+          console.log("Success modal should be visible now");
         }, 200);
       }, 500);
     } catch (err) {
@@ -155,7 +183,7 @@ export default function UploadPage() {
       let errorMessage = "Upload failed. Please try again.";
       
       if (err?.response?.status === 413) {
-        errorMessage = "File too large. Please choose a smaller file.";
+        errorMessage = "One or more files are too large. Please choose smaller files.";
       } else if (err?.response?.status === 400) {
         errorMessage = "Invalid file format. Please use PDF or image files.";
       } else if (err?.response?.status === 401) {
@@ -168,7 +196,7 @@ export default function UploadPage() {
       
       setError(errorMessage);
       setLoading(false);
-      setFile(null); // Reset file on error
+      setFiles([]); // Reset files on error
       setUploadProgress(0); // Reset progress
       // Ensure user cannot proceed to token page on error
       setIsUploaded(false);
@@ -233,7 +261,12 @@ export default function UploadPage() {
                   </motion.div>
                   
                   <h2 className="text-2xl font-bold text-white mb-2">Upload Successful!</h2>
-                  <p className="text-gray-400 mb-6">Your document has been secured and is ready for printing.</p>
+                  <p className="text-gray-400 mb-6">
+                    {files.length === 1 
+                      ? "Your document has been secured and is ready for printing." 
+                      : `Your ${files.length} documents have been secured and are ready for printing.`
+                    }
+                  </p>
                   
                   <div className="space-y-3">
                     <motion.button
@@ -302,7 +335,10 @@ export default function UploadPage() {
                   Upload <span className="text-green-400">Successful!</span>
                 </h1>
                 <p className="text-xl text-gray-400 mb-2">
-                  Document is secured and ready for printing
+                  {files.length === 1 
+                    ? "Document is secured and ready for printing"
+                    : `${files.length} documents are secured and ready for printing`
+                  }
                 </p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-400/10 border border-green-400/30 rounded-full">
                   <Check className="w-4 h-4 text-green-400" />
@@ -384,8 +420,9 @@ export default function UploadPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="application/pdf,image/*"
+                  multiple
                   className="hidden"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={handleFileSelect}
                 />
 
                 {/* Error Message */}
@@ -424,20 +461,55 @@ export default function UploadPage() {
                   }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={handleFileDrop}
-                  className={`cursor-pointer border-2 border-dashed rounded-xl p-12 mb-8 flex flex-col items-center gap-4 transition-all ${dragOver ? "border-[#FF6B35] bg-[#FF6B35]/5" : "border-white/10 bg-white/5"}`}
+                  className={`cursor-pointer border-2 border-dashed rounded-xl p-8 mb-6 flex flex-col items-center gap-4 transition-all ${dragOver ? "border-[#FF6B35] bg-[#FF6B35]/5" : "border-white/10 bg-white/5"}`}
                 >
                   <Upload
                     className={`w-8 h-8 ${dragOver ? "text-[#FF6B35]" : "text-gray-500"}`}
                   />
                   <div className="text-center">
                     <p className="text-sm font-medium text-white">
-                      {file ? file.name : "Select your file"}
+                      {files.length === 0 ? "Select your files" : `${files.length} file(s) selected`}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      PDF or Images supported
+                      PDF or Images supported (multiple files allowed)
                     </p>
                   </div>
                 </div>
+
+                {/* File List */}
+                {files.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-gray-400 mb-3">Selected Files:</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {files.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-2 h-2 bg-[#FF6B35] rounded-full flex-shrink-0"></div>
+                            <span className="text-sm text-gray-300 truncate">
+                              {file.name}
+                            </span>
+                            <span className="text-xs text-gray-500 flex-shrink-0">
+                              ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(index);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
                   {["B/W", "Color"].map((opt) => (
@@ -471,10 +543,10 @@ export default function UploadPage() {
 
                 <button
                   type="submit"
-                  disabled={loading || !file}
+                  disabled={loading || files.length === 0}
                   className="w-full bg-[#FF6B35] hover:bg-[#FF8A50] disabled:opacity-50 py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all"
                 >
-                  {loading ? "Processing..." : "Secure Upload"}
+                  {loading ? "Processing..." : `Secure Upload${files.length > 1 ? ` (${files.length} files)` : ''}`}
                   {!loading && <ChevronRight className="w-5 h-5" />}
                 </button>
               </div>
