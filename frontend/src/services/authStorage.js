@@ -5,7 +5,8 @@ export function getAuth() {
     const raw = localStorage.getItem(AUTH_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
-  } catch (_e) {
+  } catch (error) {
+    console.error("Error parsing auth storage:", error);
     return null;
   }
 }
@@ -21,4 +22,3 @@ export function clearAuth() {
 export function getAuthToken() {
   return getAuth()?.token || null;
 }
-

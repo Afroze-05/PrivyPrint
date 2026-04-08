@@ -1,741 +1,553 @@
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, Printer, Lock, FileText, Zap, Eye, Server } from "lucide-react";
+import { Shield, Printer, Lock, FileText, ChevronDown, Cpu, ArrowRight } from "lucide-react";
 
-/* ─────────────────────────────────────────────
-   Global CSS injected once
-───────────────────────────────────────────── */
-const LANDING_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap');
+const bgGif = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
-  .lp-root * { box-sizing: border-box; }
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-  /* ── Grain overlay ── */
-  .lp-grain {
-    position: fixed; inset: 0; z-index: 100; pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    background-size: 200px 200px;
-    mix-blend-mode: overlay;
-  }
+/* ── Dot-grid background ── */
+const GridDots = ({ color = "var(--accent)", opacity = 0.1 }) => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, ${color} 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity,
+    }}
+  />
+);
 
-  /* ── Status pill ── */
-  .lp-status {
-    position: fixed; top: 1.75rem; right: 1.75rem; z-index: 200;
-    display: flex; align-items: center; gap: 0.6rem;
-    background: rgba(38,51,59,0.85);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(59,188,217,0.2);
-    padding: 0.45rem 0.9rem 0.45rem 0.6rem;
-    border-radius: 100px;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.12em;
-    color: #3BBCD9; text-transform: uppercase;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(59,188,217,0.1) inset;
-  }
-  .lp-status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #D91828;
-    box-shadow: 0 0 8px #D91828, 0 0 16px rgba(217,24,40,0.5);
-    animation: lp-pulse 1.8s ease-in-out infinite;
-  }
-  @keyframes lp-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.6; transform: scale(0.85); }
-  }
+/* ── Ambient glow orb with subtle animation ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{
+      scale: [1, 1.1, 1.05, 1.15, 1],
+      opacity: [0.08, 0.12, 0.1, 0.15, 0.08],
+      x: [0, 10, -5, 8, 0],
+      y: [0, -8, 5, -3, 0],
+    }}
+    transition={{
+      duration: 12,
+      repeat: Infinity,
+      delay,
+      ease: "easeInOut",
+      times: [0, 0.25, 0.5, 0.75, 1],
+    }}
+  />
+);
 
-  /* ── Scroll indicator ── */
-  .lp-scroll-hint {
-    position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
-    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(59,188,217,0.4);
-    animation: lp-float 2.5s ease-in-out infinite;
-    z-index: 10;
-  }
-  .lp-scroll-track {
-    width: 1px; height: 40px;
-    background: linear-gradient(to bottom, rgba(59,188,217,0.5), transparent);
-  }
-  @keyframes lp-float {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50%       { transform: translateX(-50%) translateY(6px); }
-  }
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
 
-  /* ── Hero grid ── */
-  .lp-hero-grid {
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(59,188,217,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59,188,217,0.04) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse 70% 70% at center, black 30%, transparent 100%);
-  }
+/* ── Premium Stacked Card Component ── */
+const StackedCard = ({ children, delay = 0, className = "" }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60, scale: 0.96 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ 
+        delay, 
+        duration: 0.8,
+        ease: [0.22, 1, 0.36, 1]
+      }}
+      className={`relative backdrop-blur-xl border transition-all duration-500 ${className}`}
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "24px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)",
+        willChange: "transform"
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
-  /* ── Hero corner marks ── */
-  .lp-corner {
-    position: absolute; width: 22px; height: 22px;
-    border-color: rgba(59,188,217,0.35); border-style: solid;
-  }
-  .lp-corner-tl { top: 20px; left: 20px; border-width: 1.5px 0 0 1.5px; }
-  .lp-corner-tr { top: 20px; right: 20px; border-width: 1.5px 1.5px 0 0; }
-  .lp-corner-bl { bottom: 20px; left: 20px; border-width: 0 0 1.5px 1.5px; }
-  .lp-corner-br { bottom: 20px; right: 20px; border-width: 0 1.5px 1.5px 0; }
+/* ── Enhanced Feature card with premium design ── */
+const FeatureCard = ({ icon, title, text, index }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60, scale: 0.96 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ 
+        delay: index * 0.15, 
+        duration: 0.8,
+        ease: [0.22, 1, 0.36, 1]
+      }}
+      whileHover={{ 
+        y: -6,
+        scale: 1.02,
+        transition: { duration: 0.3, ease: "easeOut" }
+      }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
+      className="group relative backdrop-blur-xl p-8 border transition-all duration-300 overflow-hidden"
+      style={{ 
+        background: "rgba(255,255,255,0.03)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "24px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)",
+        willChange: "transform"
+      }}
+    >
+      {/* Subtle glow on hover */}
+      <motion.div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 rounded-3xl"
+        style={{ 
+          background: "radial-gradient(ellipse at center, rgba(255, 107, 53, 0.05) 0%, transparent 70%)",
+        }}
+      />
 
-  /* ── Hero tagline ── */
-  .lp-tagline {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase;
-    color: rgba(59,188,217,0.55);
-    border: 1px solid rgba(59,188,217,0.15);
-    padding: 0.35rem 0.85rem;
-    border-radius: 4px;
-    display: inline-block;
-    background: rgba(59,188,217,0.04);
-  }
-
-  /* ── Brand title ── */
-  .lp-brand {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900;
-    font-size: clamp(5rem, 14vw, 10rem);
-    letter-spacing: -0.02em;
-    line-height: 0.9;
-    text-transform: uppercase;
-    color: #D91828;
-    text-shadow:
-      0 0 80px rgba(217,24,40,0.3),
-      4px 4px 0px rgba(0,0,0,0.4);
-    margin: 0;
-  }
-  .lp-brand span { color: #3BBCD9; text-shadow: 0 0 80px rgba(59,188,217,0.3), 4px 4px 0px rgba(0,0,0,0.4); }
-
-  .lp-brand-sub {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 600; font-size: 1.05rem;
-    letter-spacing: 0.5em; text-transform: uppercase;
-    color: rgba(59,188,217,0.65);
-    margin: 0;
-  }
-
-  /* ── Feature cards ── */
-  .lp-feat-card {
-    background: rgba(38,51,59,0.85);
-    border-top: 3px solid #D91828;
-    border-left: 1px solid rgba(255,255,255,0.06);
-    border-right: 1px solid rgba(255,255,255,0.06);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    padding: 2rem 1.75rem;
-    position: relative; overflow: hidden;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    cursor: default;
-  }
-  .lp-feat-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 80px;
-    background: linear-gradient(180deg, rgba(217,24,40,0.06) 0%, transparent 100%);
-    pointer-events: none;
-  }
-  .lp-feat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(217,24,40,0.25);
-  }
-  .lp-feat-num {
-    position: absolute; top: 1.25rem; right: 1.25rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem; letter-spacing: 0.12em; color: rgba(59,188,217,0.25);
-  }
-  .lp-feat-icon-wrap {
-    width: 48px; height: 48px;
-    background: rgba(59,188,217,0.08);
-    border: 1px solid rgba(59,188,217,0.15);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 1.25rem;
-  }
-  .lp-feat-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 800; font-size: 1.25rem;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    color: #3BBCD9; margin: 0 0 0.65rem 0;
-  }
-  .lp-feat-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; line-height: 1.65;
-    color: rgba(255,255,255,0.45); font-weight: 300; margin: 0;
-  }
-
-  /* ── Section heading ── */
-  .lp-section-h {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; text-transform: uppercase;
-    letter-spacing: -0.02em;
-    line-height: 0.9; margin: 0;
-  }
-
-  /* ── Stat block ── */
-  .lp-stat {
-    display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
-  }
-  .lp-stat-val {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: clamp(3rem, 6vw, 5rem);
-    letter-spacing: -0.03em; line-height: 1;
-  }
-  .lp-stat-unit {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); margin-top: 0.15rem;
-  }
-
-  /* ── Divider line ── */
-  .lp-hline {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-  }
-  .lp-vline {
-    width: 1px; align-self: stretch;
-    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.12), transparent);
-  }
-
-  /* ── Encryption badge ── */
-  .lp-enc-badge {
-    display: inline-flex; align-items: center; gap: 0.6rem;
-    border: 1px solid rgba(217,145,13,0.3);
-    background: rgba(217,145,13,0.07);
-    padding: 0.5rem 1rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(217,145,13,0.7);
-  }
-  .lp-enc-badge-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #D9910D;
-    box-shadow: 0 0 6px #D9910D;
-  }
-
-  /* ── CTA buttons ── */
-  .lp-btn-primary {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    color: #fff;
-    background: #D91828;
-    border: none; cursor: pointer;
-    padding: 1.1rem 2.75rem;
-    position: relative; overflow: hidden;
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    transition: background 0.22s, transform 0.18s, box-shadow 0.22s;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
-  }
-  .lp-btn-primary:hover {
-    background: #3BBCD9;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
-  }
-  .lp-btn-primary:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
-
-  .lp-btn-secondary {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    color: #26333B;
-    background: #3BBCD9;
-    border: none; cursor: pointer;
-    padding: 1.1rem 2.75rem;
-    position: relative; overflow: hidden;
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    transition: background 0.22s, transform 0.18s, box-shadow 0.22s;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
-  }
-  .lp-btn-secondary:hover {
-    background: #D91828;
-    color: #fff;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
-  }
-  .lp-btn-secondary:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
-
-  /* ── Panel 3 background stripes ── */
-  .lp-rust-stripes {
-    position: absolute; inset: 0; overflow: hidden; pointer-events: none;
-  }
-  .lp-rust-stripes::before {
-    content: '';
-    position: absolute; inset: -50%;
-    background: repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 40px,
-      rgba(0,0,0,0.06) 40px,
-      rgba(0,0,0,0.06) 80px
-    );
-  }
-
-  /* ── Panel 2 ── */
-  .lp-stats-grid {
-    display: flex; align-items: center; gap: 0;
-    border: 1px solid rgba(255,255,255,0.07);
-    background: rgba(38,51,59,0.6);
-    backdrop-filter: blur(8px);
-  }
-  .lp-stat-cell {
-    flex: 1; padding: 2.5rem 2rem; text-align: center;
-    position: relative;
-  }
-  .lp-stat-cell + .lp-stat-cell::before {
-    content: '';
-    position: absolute; top: 20%; left: 0;
-    height: 60%; width: 1px;
-    background: rgba(255,255,255,0.07);
-  }
-
-  /* ── Protocol list ── */
-  .lp-protocol-row {
-    display: flex; align-items: center; gap: 0.85rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
-  }
-  .lp-protocol-row:last-child { border-bottom: none; }
-  .lp-protocol-tag {
-    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 0.2rem 0.5rem;
-    background: rgba(217,24,40,0.12);
-    border: 1px solid rgba(217,24,40,0.2);
-    color: #F87171;
-    white-space: nowrap;
-  }
-
-  /* ── CTA card ── */
-  .lp-cta-card {
-    background: rgba(38,51,59,0.9);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-bottom: 4px solid #D91828;
-    padding: 3.5rem;
-    position: relative; overflow: hidden;
-    max-width: 640px; width: 100%;
-  }
-  .lp-cta-card::before {
-    content: '';
-    position: absolute; top: -60px; right: -60px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(217,24,40,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .lp-cta-h {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: clamp(3.5rem, 7vw, 6rem);
-    letter-spacing: -0.02em; text-transform: uppercase;
-    line-height: 0.9; margin: 0 0 0.1em 0;
-    color: #fff;
-  }
-  .lp-cta-h span { color: #D91828; }
-
-  /* Scan line effect on hover for buttons */
-  @keyframes lp-scan {
-    from { transform: translateY(-100%); }
-    to   { transform: translateY(100%); }
-  }
-  .lp-btn-primary:hover::after,
-  .lp-btn-secondary:hover::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
-    animation: lp-scan 0.5s ease;
-    pointer-events: none;
-  }
-`;
-
-function injectLandingStyles() {
-  if (document.getElementById('landing-page-styles')) return;
-  const tag = document.createElement('style');
-  tag.id = 'landing-page-styles';
-  tag.textContent = LANDING_CSS;
-  document.head.appendChild(tag);
-}
+      <div className="relative z-10">
+        {/* Premium icon */}
+        <motion.div 
+          className="mb-6 w-fit p-4 rounded-2xl"
+          style={{
+            background: isHovered 
+              ? "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)"
+              : "rgba(255, 107, 53, 0.1)",
+            border: "1px solid rgba(255, 107, 53, 0.2)",
+            borderRadius: "16px"
+          }}
+          whileHover={{ 
+            scale: 1.1,
+            transition: { duration: 0.3, ease: "easeOut" }
+          }}
+        >
+          <motion.div 
+            style={{ color: isHovered ? "white" : "#FF6B35" }}
+            transition={{ duration: 0.3 }}
+          >
+            {icon}
+          </motion.div>
+        </motion.div>
+        
+        {/* Clean typography */}
+        <motion.h3
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.15 + 0.2, duration: 0.6 }}
+          className="text-xl font-semibold mb-3"
+          style={{ 
+            fontFamily: '"Inter Tight", "Inter", sans-serif',
+            color: "#EAEAEA",
+            fontWeight: 600,
+            letterSpacing: "-0.01em"
+          }}
+        >
+          {title}
+        </motion.h3>
+        
+        <motion.p 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.15 + 0.3, duration: 0.6 }}
+          className="leading-relaxed text-base"
+          style={{ 
+            fontFamily: '"Inter", sans-serif',
+            color: "#999999",
+            lineHeight: 1.6,
+            fontWeight: 400
+          }}
+        >
+          {text}
+        </motion.p>
+      </div>
+    </motion.div>
+  );
+};
 
 function Landing() {
   const navigate = useNavigate();
   const targetRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
 
-  if (typeof window !== 'undefined') injectLandingStyles();
+  useEffect(() => { setMounted(true); }, []);
 
   const { scrollYProgress } = useScroll({
     target: targetRef,
     offset: ["start start", "end end"],
   });
 
-  const shutterSpring = { mass: 1.5, stiffness: 100, damping: 14, restDelta: 0.001 };
+  // Smooth scroll progress with premium easing
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 40,
+    damping: 25,
+    mass: 1,
+    restDelta: 0.001
+  });
 
-  const rawY1 = useTransform(scrollYProgress, [0, 0.33], ["-100%", "0%"]);
-  const rawY2 = useTransform(scrollYProgress, [0.33, 0.66], ["-100%", "0%"]);
-  const rawY3 = useTransform(scrollYProgress, [0.66, 1],  ["-100%", "0%"]);
+  const shutterSpring = { mass: 1, stiffness: 40, damping: 25, restDelta: 0.001 };
+
+  const rawY1 = useTransform(smoothProgress, [0, 0.33], ["-100%", "0%"]);
+  const rawY2 = useTransform(smoothProgress, [0.33, 0.66], ["-100%", "0%"]);
+  const rawY3 = useTransform(smoothProgress, [0.66, 1], ["-100%", "0%"]);
 
   const shutter1Y = useSpring(rawY1, shutterSpring);
   const shutter2Y = useSpring(rawY2, shutterSpring);
   const shutter3Y = useSpring(rawY3, shutterSpring);
 
+  // Premium parallax effect for background elements
+  const parallaxY = useTransform(smoothProgress, [0, 1], [0, -30]);
+
+  // Section scale transforms for stacking illusion
+  const sectionScale = useTransform(smoothProgress, [0, 0.33, 0.66, 1], [1, 0.98, 0.96, 0.94]);
+
   const features = [
     {
-      icon: <Shield size={20} color="#3BBCD9" />,
+      icon: <Shield className="w-7 h-7 text-[var(--accent)]" />,
       title: "Encrypted Node",
-      text: "Data packets shredded immediately post-transmission. Zero persistence on network nodes.",
-      num: "01",
+      text: "Data packets are shredded post-transmission.",
     },
     {
-      icon: <Printer size={20} color="#3BBCD9" />,
+      icon: <Printer className="w-7 h-7 text-[var(--accent)]" />,
       title: "Physical Link",
-      text: "Document released only via authenticated proximity token. No remote dispatch.",
-      num: "02",
+      text: "Release only via authenticated proximity.",
     },
     {
-      icon: <Lock size={20} color="#3BBCD9" />,
+      icon: <Lock className="w-7 h-7 text-[var(--accent)]" />,
       title: "Zero Cache",
-      text: "No residual memory retained on hardware. Cold-wipe after every print cycle.",
-      num: "03",
+      text: "No residual memory left on hardware.",
     },
-  ];
-
-  const protocols = [
-    { tag: "ENC", text: "AES-256-GCM symmetric encryption at rest" },
-    { tag: "TLS", text: "TLS 1.3 enforced on all transport layers" },
-    { tag: "AUTH", text: "TOTP proximity token with 90-second TTL" },
-    { tag: "PURGE", text: "Automatic data purge post-confirmation" },
   ];
 
   return (
     <div
       ref={targetRef}
-      className="lp-root"
-      style={{ position: 'relative', height: '400vh', background: '#26333B', overflow: 'visible', fontFamily: 'sans-serif' }}
+      className="relative min-h-screen overflow-hidden"
+      style={{
+        background: "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+        scrollBehavior: "smooth",
+        scrollSnapType: "y mandatory"
+      }}
     >
-      {/* Grain overlay */}
-      <div className="lp-grain" />
-
-      <div style={{ position: 'sticky', top: 0, height: '100vh', width: '100%', overflow: 'hidden' }}>
-
-        {/* ═══════════════════════════════════════
-            PANEL 0 — HERO
-        ════════════════════════════════════════ */}
-        <section
-          style={{
-            position: 'absolute', inset: 0, zIndex: 0,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            textAlign: 'center', padding: '2rem',
-            background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(59,188,217,0.06) 0%, transparent 60%), #26333B',
-          }}
+      {/* Premium background elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <NoiseSVG />
+        <motion.div style={{ y: parallaxY }} className="absolute inset-0">
+          <GridDots color="#FF6B35" opacity={0.05} />
+        </motion.div>
+        <motion.div
+          style={{ y: parallaxY }}
+          className="absolute inset-0"
         >
-          {/* Grid background */}
-          <div className="lp-hero-grid" />
+          <GlowOrb color="#FF6B35" size={600} top="-10%" left="-5%" delay={0} />
+          <GlowOrb color="#FF8A50" size={400} top="40%" left="60%" delay={3} />
+        </motion.div>
+      </div>
 
-          {/* Corner marks */}
-          <div className="lp-corner lp-corner-tl" />
-          <div className="lp-corner lp-corner-tr" />
-          <div className="lp-corner lp-corner-bl" />
-          <div className="lp-corner lp-corner-br" />
+      {/* NEW HERO SECTION (REPLACEMENT) */}
+<section className="relative min-h-screen flex items-center justify-center px-6" style={{ scrollSnapAlign: "start" }}>
 
-          {/* Content */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}
-          >
-            {/* Tagline */}
+  {/* Top Left */}
+  <div className="absolute top-6 left-6 flex items-center gap-2">
+    <Cpu className="w-3 h-3 text-[var(--accent)]/40" />
+    <span className="text-[10px] tracking-[0.4em] text-[var(--text-muted)] uppercase">
+      PRIVYPRINT OS v4.2
+    </span>
+  </div>
+
+  {/* Top Right */}
+  <div className="absolute top-6 right-6 px-4 py-2 bg-black/40 border border-[var(--accent)]/20 text-xs tracking-widest text-[var(--accent)] uppercase">
+    SYSTEM LIVE
+  </div>
+
+  <div className="relative z-10 text-center">
+
+    {/* Badge */}
+    <div className="mb-6 px-6 py-2 border border-[var(--accent)]/20 inline-flex items-center gap-2">
+      <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse" />
+      <span className="text-xs tracking-[0.4em] text-[var(--accent)] uppercase">
+        Secure Channel Active
+      </span>
+    </div>
+
+    {/* Heading */}
+    <h1 className="text-7xl md:text-9xl font-black uppercase tracking-tight">
+      <span className="text-white">PRIVY</span>
+      <span className="text-[var(--accent)]">PRINT</span>
+    </h1>
+
+    {/* Subtitle */}
+    <p className="mt-6 text-[var(--accent)] tracking-[0.4em] uppercase text-sm opacity-70">
+      PRIVACY-PROTECTED PRINTING SYSTEM
+    </p>
+
+    {/* Line */}
+    <div className="mt-6 h-[1px] w-80 mx-auto bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent" />
+
+   <button
+  onClick={() => navigate("/home")}
+  className="mt-8 px-12 py-4 uppercase tracking-[0.3em] font-bold text-white rounded-full transition-all duration-300 hover:scale-105"
+  style={{
+    background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
+  }}
+>
+  START →
+</button>
+    {/* Scroll */}
+    <div className="mt-10 flex flex-col items-center text-white/30 text-xs">
+      <span>SCROLL</span>
+      <ChevronDown className="w-4 h-4 mt-1 animate-bounce" />
+    </div>
+
+  </div>
+</section>
+
+      {/* Features Section - Stacked Card */}
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-24" style={{ scrollSnapAlign: "start" }}>
+        <StackedCard delay={0.2} className="max-w-6xl mx-auto p-16">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            {/* Left content */}
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
+              initial={{ opacity: 0, x: -60 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             >
-              <span className="lp-tagline">Privacy-Protected Printing System</span>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="inline-flex items-center gap-3 mb-6"
+              >
+                <div className="w-8 h-0.5 bg-[#FF6B35]" />
+                <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: "#FF6B35" }}>
+                  Core Features
+                </span>
+              </motion.div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="text-4xl md:text-6xl font-bold mb-6"
+                style={{
+                  fontFamily: '"Inter Tight", "Inter", sans-serif',
+                  color: "#EAEAEA",
+                  fontWeight: 700,
+                  lineHeight: 1.1
+                }}
+              >
+                Advanced{" "}
+                <motion.span
+                  style={{
+                    background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text"
+                  }}
+                >
+                  Security
+                </motion.span>
+              </motion.h2>
+
+              <motion.p
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.8 }}
+                className="text-lg leading-relaxed"
+                style={{
+                  fontFamily: '"Inter", sans-serif',
+                  color: "#999999",
+                  lineHeight: 1.6
+                }}
+              >
+                Multi-layered encryption with zero-knowledge protocols ensures your documents remain completely secure from transmission to printing.
+              </motion.p>
             </motion.div>
 
-            {/* Brand */}
-            <motion.h1
-              className="lp-brand"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.35, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            >
-              Privy<span>Print</span>
-            </motion.h1>
-
-            <motion.p
-              className="lp-brand-sub"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
-            >
-              Secure · Encrypted · Ephemeral
-            </motion.p>
-
-            {/* Subtle CTA hint */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1, duration: 0.6 }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.62rem', letterSpacing: '0.2em', textTransform: 'uppercase',
-                color: 'rgba(59,188,217,0.35)', marginTop: '0.5rem',
-              }}
-            >
-              <span>Scroll to explore</span>
-            </motion.div>
-          </motion.div>
-
-          {/* Scroll indicator */}
-          <div className="lp-scroll-hint">
-            <div className="lp-scroll-track" />
-            <span>Scroll</span>
-          </div>
-        </section>
-
-
-        {/* ═══════════════════════════════════════
-            SHUTTER 1 — FEATURES (CYAN)
-        ════════════════════════════════════════ */}
-        <motion.section
-          style={{
-            y: shutter1Y,
-            position: 'absolute', inset: 0, zIndex: 10,
-            background: '#3BBCD9',
-            display: 'flex', alignItems: 'center',
-            padding: '3rem clamp(1.5rem, 6vw, 5rem)',
-            borderBottom: '8px solid rgba(38,51,59,0.3)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.5)',
-          }}
-        >
-          {/* Subtle dot pattern */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            backgroundImage: 'radial-gradient(rgba(38,51,59,0.12) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }} />
-
-          <div style={{ width: '100%', maxWidth: '1280px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-
-            {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '3rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <div style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase',
-                  color: 'rgba(38,51,59,0.5)', marginBottom: '0.6rem',
-                }}>
-                  Core Architecture
-                </div>
-                <h2 className="lp-section-h" style={{ color: '#26333B', fontSize: 'clamp(3.5rem, 6vw, 6rem)' }}>
-                  Hardened<br />Privacy.
-                </h2>
-              </div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.68rem', lineHeight: 1.7,
-                color: 'rgba(38,51,59,0.55)',
-                maxWidth: '260px', textAlign: 'right',
-              }}>
-                Every print job is treated as a security event.<br />Nothing persists beyond the session.
-              </div>
-            </div>
-
-            {/* Feature cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1px', background: 'rgba(38,51,59,0.15)' }}>
-              {features.map((f, i) => (
-                <div key={i} className="lp-feat-card">
-                  <span className="lp-feat-num">{f.num}</span>
-                  <div className="lp-feat-icon-wrap">{f.icon}</div>
-                  <h3 className="lp-feat-title">{f.title}</h3>
-                  <p className="lp-feat-text">{f.text}</p>
-                </div>
+            {/* Right - Feature cards */}
+            <div className="space-y-6">
+              {features.map((feature, index) => (
+                <FeatureCard key={index} {...feature} index={index} />
               ))}
             </div>
-
           </div>
-        </motion.section>
+        </StackedCard>
+      </section>
 
-
-        {/* ═══════════════════════════════════════
-            SHUTTER 2 — STATS + PROTOCOLS (DARK)
-        ════════════════════════════════════════ */}
-        <motion.section
-          style={{
-            y: shutter2Y,
-            position: 'absolute', inset: 0, zIndex: 20,
-            background: '#1A2229',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '3rem clamp(1.5rem, 6vw, 5rem)',
-            borderBottom: '8px solid rgba(0,0,0,0.4)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
-            gap: '2.5rem',
-          }}
-        >
-          {/* Top label */}
-          <div style={{ textAlign: 'center' }}>
-            <div className="lp-enc-badge">
-              <span className="lp-enc-badge-dot" />
-              Military-Grade Encryption Standard
-            </div>
-          </div>
-
-          {/* Main heading */}
-          <div style={{ textAlign: 'center', marginTop: '-2rem' }}>
-            <h2 className="lp-section-h" style={{ color: '#D9910D', fontSize: 'clamp(4rem, 9vw, 4rem)' }}>
-              Locked<br /><span style={{ color: '#D91828' }}>Pad.</span>
-            </h2>
-          </div>
-
-          {/* Stats row */}
-          <div className="lp-stats-grid" style={{ width: '100%', maxWidth: '680px' , height: '160px', marginBottom: '2.5rem', marginTop: '-2rem' }}>
-            <div className="lp-stat-cell"
+      {/* Encryption Section - Stacked Card */}
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-24" style={{ scrollSnapAlign: "start" }}>
+        <StackedCard delay={0.4} className="max-w-6xl mx-auto p-16">
+          <div className="text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="inline-flex items-center gap-3 mb-6"
             >
-              <div className="lp-stat-val" style={{ color: '#3BBCD9' }}>AES</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#3BBCD9', letterSpacing: '0.1em',
-              }}>256-Bit</div>
-              <div className="lp-stat-unit">Encryption</div>
-            </div>
-            <div className="lp-stat-cell">
-              <div className="lp-stat-val" style={{ color: '#D91828' }}>0</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#F87171', letterSpacing: '0.1em',
-              }}>Bytes</div>
-              <div className="lp-stat-unit">Retained</div>
-            </div>
-            <div className="lp-stat-cell">
-              <div className="lp-stat-val" style={{ color: '#D9910D' }}>90s</div>
-              <div style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.72rem', color: '#FCD34D', letterSpacing: '0.1em',
-              }}>Token TTL</div>
-              <div className="lp-stat-unit">Expiry</div>
-            </div>
+              <div className="w-8 h-0.5 bg-[#FF6B35]" />
+              <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: "#FF6B35" }}>
+                Encryption Process
+              </span>
+              <div className="w-8 h-0.5 bg-[#FF6B35]" />
+            </motion.div>
+
+            <motion.h2
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="text-4xl md:text-6xl font-bold mb-12"
+              style={{
+                fontFamily: '"Inter Tight", "Inter", sans-serif',
+                color: "#EAEAEA",
+                fontWeight: 700,
+                lineHeight: 1.1
+              }}
+            >
+              End-to-End{" "}
+              <motion.span
+                style={{
+                  background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text"
+                }}
+              >
+                Protection
+              </motion.span>
+            </motion.h2>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-4xl mx-auto h-96 flex items-center justify-center"
+            >
+              <img 
+                src="/bg2.gif" 
+                alt="Encryption Process"
+                className="max-w-full max-h-full object-contain rounded-2xl"
+                style={{
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
+                }}
+              />
+            </motion.div>
           </div>
+        </StackedCard>
+      </section>
 
-          {/* Protocol list */}
-          <div style={{ width: '100%', maxWidth: '680px',height: 'auto', padding: '0 1rem', marginTop: '-4rem' }}>
-            <div style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.2)', marginBottom: '0.75rem', 
-            }}>
-              Active Protocols
-            </div>
-            {protocols.map((p, i) => (
-              <div key={i} className="lp-protocol-row">
-                <span className="lp-protocol-tag">{p.tag}</span>
-                <span>{p.text}</span>
-              </div>
-            ))}
-          </div>
+      {/* CTA Section - Stacked Card */}
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-24" style={{ scrollSnapAlign: "start" }}>
+        <StackedCard delay={0.6} className="max-w-4xl mx-auto p-16 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="inline-flex items-center gap-3 mb-6"
+          >
+            <div className="w-8 h-0.5 bg-[#FF6B35]" />
+            <span className="text-sm font-semibold tracking-wide" style={{ color: "#FF6B35" }}>
+              Ready to Deploy
+            </span>
+            <div className="w-8 h-0.5 bg-[#FF6B35]" />
+          </motion.div>
 
-        </motion.section>
+          <motion.h2
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="text-4xl md:text-6xl font-bold mb-8"
+            style={{
+              fontFamily: '"Inter Tight", "Inter", sans-serif',
+              color: "#EAEAEA",
+              fontWeight: 700,
+              lineHeight: 1.1
+            }}
+          >
+            Initialize{" "}
+            <motion.span
+              style={{
+                background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text"
+              }}
+            >
+              Secure Print
+            </motion.span>
+          </motion.h2>
 
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+            className="text-xl mb-12"
+            style={{
+              fontFamily: '"Inter", sans-serif',
+              color: "#999999",
+              lineHeight: 1.6
+            }}
+          >
+            Get started with enterprise-grade secure printing in minutes
+          </motion.p>
 
-        {/* ═══════════════════════════════════════
-            SHUTTER 3 — CTA (RUST)
-        ════════════════════════════════════════ */}
-        <motion.section
-          style={{
-            y: shutter3Y,
-            position: 'absolute', inset: 0, zIndex: 30,
-            background: '#0E1519',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            padding: '3rem 1.5rem',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.7)',
-          }}
-        >
-          {/* Stripe texture */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
-          }}>
-            <div style={{
-              position: 'absolute', inset: '-50%',
-              background: `repeating-linear-gradient(-45deg, transparent, transparent 60px, rgba(217,24,40,0.025) 60px, rgba(217,24,40,0.025) 61px)`,
-            }} />
-          </div>
-
-          {/* Large accent glow */}
-          <div style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '600px', height: '400px',
-            background: 'radial-gradient(ellipse, rgba(217,24,40,0.08) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
-
-          <div className="lp-cta-card">
-
-            {/* File icon badge */}
-            <div style={{
-              width: 52, height: 52,
-              background: 'rgba(217,24,40,0.12)',
-              border: '1px solid rgba(217,24,40,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: '1.75rem',
-            }}>
-              <FileText size={24} color="#F87171" />
-            </div>
-
-            {/* Heading */}
-            <h2 className="lp-cta-h">
-              Initialize<br />
-              <span>Secure</span> Print
-            </h2>
-
-            {/* Subtext */}
-            <p style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.72rem', lineHeight: 1.75,
-              color: 'rgba(255,255,255,0.3)',
-              margin: '1.5rem 0 2.25rem 0',
-              maxWidth: 400,
-            }}>
-              Upload your document, choose print parameters, and receive a one-time secure release token.
-            </p>
-
-            <div className="lp-hline" style={{ marginBottom: '2.25rem' }} />
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-              <button className="lp-btn-primary" onClick={() => navigate('/signup')}>
-                Start Printing
-              </button>
-              <button className="lp-btn-secondary" onClick={() => navigate('/admin/login')}>
-                Admin Login
-              </button>
-            </div>
-
-            {/* Mono note */}
-            <div style={{
-              marginTop: '2rem',
-              fontFamily: "'DM Mono', monospace",
-              fontSize: '0.6rem', letterSpacing: '0.12em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-            }}>
-              <span style={{ color: 'rgba(52,211,153,0.5)' }}>●</span>
-              No account required for guest print
-            </div>
-          </div>
-
-        </motion.section>
-
-      </div>
-
-      {/* ── Floating status pill ── */}
-      <div className="lp-status">
-        <span className="lp-status-dot" />
-        System Live
-      </div>
+          <motion.button
+            initial={{ opacity: 0, y: 30, scale: 0.96 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.6, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            onClick={() => navigate("/home")}
+            whileHover={{ 
+              y: -4,
+              scale: 1.02,
+              boxShadow: "0 20px 60px rgba(255, 107, 53, 0.3)",
+              transition: { duration: 0.3, ease: "easeOut" }
+            }}
+            whileTap={{ scale: 0.98 }}
+            className="group relative px-12 py-4 rounded-2xl font-semibold text-white overflow-hidden transition-all duration-300"
+            style={{
+              background: "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)",
+              fontFamily: '"Inter Tight", "Inter", sans-serif',
+              fontSize: "16px",
+              fontWeight: 600
+            }}
+          >
+            <span className="relative z-10 flex items-center gap-3">
+              Get Started
+              <ArrowRight className="w-5 h-5" />
+            </span>
+            {/* Hover overlay */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{
+                x: ["-100%", "100%"],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            />
+          </motion.button>
+        </StackedCard>
+      </section>
     </div>
   );
 }

@@ -12,11 +12,20 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     password: { type: String, required: true, select: false },
-    role: { type: String, enum: ["admin", "customer"], default: "customer", required: true },
+    role: {
+      type: String,
+      enum: ["admin", "customer"],
+      default: "customer",
+      required: true,
+    },
     trustScore: { type: Number, default: 100, min: 0, max: 1000 },
+
+    // ADD THESE THREE FIELDS BELOW:
+    isVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpires: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("User", userSchema);
-

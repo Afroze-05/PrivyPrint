@@ -1,413 +1,412 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+console.log(motion);
+import {
+  CheckCircle,
+  Cpu,
+  Download,
+  ArrowLeft,
+  AlertTriangle,
+  Timer,
+  Copy,
+  Lock,
+  Check,
+  Mic,
+} from "lucide-react";
+import { getCustomerToken } from "../services/customerTokenStorage";
 
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+/* ── Noise grain overlay ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.045] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.68"
+        numOctaves="3"
+        stitchTiles="stitch"
+      />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
+/* ── Dot-grid background ── */
+const GridDots = () => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, rgba(255, 107, 53, 0.3) 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity: 0.03,
+    }}
+  />
+);
 
-  :root {
-    --bg:         #070D1A;
-    --bg2:        #0B1221;
-    --surface:    rgba(255,255,255,0.03);
-    --surface2:   rgba(255,255,255,0.06);
-    --border:     rgba(255,255,255,0.08);
-    --border-hi:  rgba(56,139,253,0.5);
-    --blue:       #388BFD;
-    --blue-glow:  rgba(56,139,253,0.3);
-    --blue-dim:   rgba(56,139,253,0.12);
-    --green:      #3FB950;
-    --green-glow: rgba(63,185,80,0.3);
-    --green-dim:  rgba(63,185,80,0.1);
-    --red:        #F85149;
-    --red-dim:    rgba(248,81,73,0.08);
-    --red-border: rgba(248,81,73,0.2);
-    --text:       #CDD9E5;
-    --text-dim:   #768390;
-    --mono:       'Share Tech Mono', monospace;
-    --display:    'Barlow Condensed', sans-serif;
-    --body:       'Inter', sans-serif;
+/* ── Ambient glow orb ── */
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{ scale: [1, 1.18, 1], opacity: [0.12, 0.22, 0.12] }}
+    transition={{ duration: 6, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
+
+/* ── Scan-line sweep ── */
+const ScanLine = () => (
+  <motion.div
+    className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF6B35]/25 to-transparent pointer-events-none z-10"
+    animate={{ top: ["0%", "100%"] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+  />
+);
+
+/* ── QR-code mosaic ── */
+const QRMosaic = ({ seed = 42 }) => {
+  const cells = Array.from({ length: 49 }, (_, i) => {
+    const v = (i * 7 + seed * 3) % 17;
+    return v > 7;
+  });
+  return (
+    <div
+      className="w-24 h-24 p-2 border border-white/15"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        clipPath:
+          "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+      }}
+    >
+      <div className="w-full h-full grid grid-cols-7 gap-[1.5px]">
+        {cells.map((filled, i) => (
+          <div
+            key={i}
+            className="rounded-[1px]"
+            style={{ background: filled ? "#FF6B35" : "transparent" }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ── Countdown timer ── */
+const Countdown = ({ navigate, onExpired }) => {
+  const [secs, setSecs] = useState(() => {
+    // Get stored timer start time or initialize new
+    const storedStartTime = localStorage.getItem('tokenTimerStart');
+    const storedDuration = localStorage.getItem('tokenDuration');
+    
+    if (storedStartTime && storedDuration) {
+      const elapsed = Math.floor((Date.now() - parseInt(storedStartTime)) / 1000);
+      const remaining = parseInt(storedDuration) - elapsed;
+      return Math.max(0, remaining);
+    }
+    
+    // Store initial timer state
+    localStorage.setItem('tokenTimerStart', Date.now().toString());
+    localStorage.setItem('tokenDuration', '60');
+    return 60;
+  });
+
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSecs((s) => {
+        const newSecs = Math.max(0, s - 1);
+        
+        // Update localStorage
+        const elapsed = 60 - newSecs;
+        localStorage.setItem('tokenTimerStart', (Date.now() - (elapsed * 1000)).toString());
+        localStorage.setItem('tokenDuration', '60');
+        
+        if (newSecs === 0) {
+          setExpired(true);
+          // Clear customer token when expired
+          localStorage.removeItem('customerToken');
+          localStorage.removeItem('tokenTimerStart');
+          localStorage.removeItem('tokenDuration');
+          onExpired();
+        }
+        
+        return newSecs;
+      });
+    }, 1000);
+    
+    return () => clearInterval(id);
+  }, [onExpired]);
+
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+  const pct = secs > 0 ? (secs / 60) * 100 : 0;
+  const accent = secs > 20 ? "#FF6B35" : "#ef4444";
+
+  if (expired) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-6 border border-red-500/30 bg-red-500/10 rounded-lg">
+        <AlertTriangle className="w-8 h-8 text-red-400" />
+        <div className="text-center">
+          <span className="text-sm font-black text-red-400 uppercase tracking-widest">
+            Token Expired
+          </span>
+          <p className="text-xs text-gray-400 mt-2">
+            Please upload the document again.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/upload")}
+          className="px-4 py-2 bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-lg hover:bg-red-600 transition-colors"
+        >
+          Upload Again
+        </button>
+      </div>
+    );
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  .tk-page {
-    min-height: 100vh;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1.25rem;
-    font-family: var(--body);
-    position: relative;
-    overflow: hidden;
-    text-align: center;
-  }
-
-  .tk-page::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(56,139,253,0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(56,139,253,0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 100%);
-    pointer-events: none;
-  }
-
-  .tk-blob1 {
-    position: absolute;
-    width: 500px; height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(63,185,80,0.06) 0%, transparent 65%);
-    top: -120px; right: -100px;
-    pointer-events: none;
-  }
-  .tk-blob2 {
-    position: absolute;
-    width: 500px; height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(56,139,253,0.07) 0%, transparent 65%);
-    bottom: -150px; left: -120px;
-    pointer-events: none;
-  }
-
-  .tk-wrap {
-    width: 100%;
-    max-width: 420px;
-    position: relative;
-    z-index: 1;
-    animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(28px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .tk-icon {
-    width: 68px; height: 68px;
-    border-radius: 50%;
-    margin: 0 auto 1.25rem;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--green-dim);
-    border: 1.5px solid rgba(63,185,80,0.35);
-    font-size: 1.6rem;
-    color: var(--green);
-    box-shadow: 0 0 0 8px rgba(63,185,80,0.06), 0 0 30px var(--green-glow);
-    animation: iconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both 0.15s;
-  }
-
-  @keyframes iconPop {
-    from { opacity: 0; transform: scale(0.5); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  .tk-title {
-    font-family: var(--display);
-    font-size: 2rem;
-    font-weight: 800;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    margin-bottom: 0.25rem;
-  }
-
-  .tk-title span { color: var(--green); }
-
-  .tk-sub {
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 1.75rem;
-  }
-
-  .tk-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .tk-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--blue), var(--green));
-  }
-
-  .tk-card-body { padding: 1.75rem; }
-
-  .tk-token-box {
-    background: linear-gradient(145deg, #0A192F 0%, #0d2040 100%);
-    border: 1px solid rgba(56,139,253,0.2);
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .tk-token-box::after {
-    content: '';
-    position: absolute;
-    bottom: -30px; left: 50%;
-    transform: translateX(-50%);
-    width: 180px; height: 60px;
-    background: radial-gradient(ellipse, rgba(56,139,253,0.2) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .tk-token-label {
-    font-family: var(--mono);
-    font-size: 0.62rem;
-    color: var(--blue);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  .tk-token-label::before,
-  .tk-token-label::after {
-    content: '';
-    flex: 1;
-    max-width: 40px;
-    height: 1px;
-    background: rgba(56,139,253,0.3);
-  }
-
-  .tk-token-value {
-    font-family: var(--mono);
-    font-size: 2.8rem;
-    color: #fff;
-    letter-spacing: 0.15em;
-    text-shadow: 0 0 24px rgba(56,139,253,0.5), 0 0 60px rgba(56,139,253,0.2);
-    margin-bottom: 1rem;
-    line-height: 1;
-  }
-
-  .tk-badges {
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .tk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 99px;
-    font-family: var(--mono);
-    font-size: 0.62rem;
-    color: var(--text-dim);
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .tk-badge-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 5px var(--green-glow);
-    animation: blink 1.5s ease-in-out infinite;
-  }
-
-  @keyframes blink {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.3; }
-  }
-
-  .tk-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 1.25rem 0;
-  }
-
-  .tk-qr-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 1.5rem;
-    opacity: 0.55;
-  }
-
-  .tk-qr {
-    width: 96px; height: 96px;
-    border: 1.5px solid rgba(56,139,253,0.25);
-    border-radius: 12px;
-    padding: 8px;
-    background: rgba(56,139,253,0.04);
-  }
-
-  .tk-qr-grid {
-    width: 100%; height: 100%;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 2px;
-  }
-
-  .tk-qr-cell { border-radius: 2px; }
-
-  .tk-qr-label {
-    font-family: var(--mono);
-    font-size: 0.6rem;
-    color: var(--text-dim);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .tk-btn-group { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.25rem; }
-
-  .tk-btn-primary {
-    width: 100%;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--border-hi);
-    border-radius: 12px;
-    background: linear-gradient(135deg, rgba(56,139,253,0.2) 0%, rgba(56,139,253,0.08) 100%);
-    color: var(--blue);
-    font-family: var(--display);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .tk-btn-primary::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(56,139,253,0.1), transparent);
-    transform: translateX(-100%);
-    transition: transform 0.55s;
-  }
-
-  .tk-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(56,139,253,0.2); }
-  .tk-btn-primary:hover::before { transform: translateX(100%); }
-
-  .tk-btn-secondary {
-    width: 100%;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--surface);
-    color: var(--text-dim);
-    font-family: var(--display);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .tk-btn-secondary:hover {
-    border-color: rgba(255,255,255,0.15);
-    background: var(--surface2);
-    color: var(--text);
-    transform: translateY(-1px);
-  }
-
-  .tk-warning {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0.75rem 1rem;
-    border-radius: 12px;
-    background: var(--red-dim);
-    border: 1px solid var(--red-border);
-    font-family: var(--mono);
-    font-size: 0.63rem;
-    color: var(--red);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-`;
-
-const QR_PATTERN = [1,0,1,1,0, 0,1,0,1,1, 1,1,1,0,0, 0,0,1,1,0, 1,0,0,1,1];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Timer className="w-3.5 h-3.5" style={{ color: accent }} />
+          <span className="text-[9px] font-black tracking-[0.45em] text-white/30 uppercase">
+            Token Expires In
+          </span>
+        </div>
+        <span
+          className="text-sm font-black tracking-widest"
+          style={{ fontFamily: "monospace", color: accent }}
+        >
+          {mm}:{ss}
+        </span>
+      </div>
+      <div className="h-[4px] bg-white/6 overflow-hidden">
+        <motion.div
+          className="h-full"
+          style={{
+            background: accent,
+            width: `${pct}%`,
+            boxShadow: `0 0 8px ${accent}`,
+          }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.5 }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function TokenPage() {
   const navigate = useNavigate();
-  const token = localStorage.getItem('activeToken') || 'SPX-0000';
-  const type  = localStorage.getItem('printType')  || 'B/W';
+  const customerToken = getCustomerToken();
+  const token = customerToken?.token || "SPX-0000";
+  const type = localStorage.getItem("printType") || "B/W";
+  const [copied, setCopied] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  // Check if token exists, if not redirect to upload
+  useEffect(() => {
+    if (!customerToken?.token) {
+      navigate("/upload");
+      return;
+    }
+    
+    // Additional check: ensure token was generated from a successful upload
+    const uploadStatus = customerToken?.status;
+    if (!uploadStatus || (uploadStatus !== "waiting" && uploadStatus !== "processing" && uploadStatus !== "completed")) {
+      navigate("/upload");
+      return;
+    }
+  }, [customerToken, navigate]);
+
+  // Check if token is already expired on mount
+  useEffect(() => {
+    const storedStartTime = localStorage.getItem('tokenTimerStart');
+    const storedDuration = localStorage.getItem('tokenDuration');
+    
+    if (storedStartTime && storedDuration) {
+      const elapsed = Math.floor((Date.now() - parseInt(storedStartTime)) / 1000);
+      const remaining = parseInt(storedDuration) - elapsed;
+      if (remaining <= 0) {
+        setExpired(true);
+        localStorage.removeItem('customerToken');
+        localStorage.removeItem('tokenTimerStart');
+        localStorage.removeItem('tokenDuration');
+      }
+    }
+  }, []);
+
+  const handleCopyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.log(err);
+      const textArea = document.createElement("textarea");
+      textArea.value = token;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
-    <>
-      <style>{styles}</style>
-      <div className="tk-page">
-        <div className="tk-blob1" />
-        <div className="tk-blob2" />
+    <div
+      className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden font-sans"
+      style={{
+        background:
+          "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+      }}
+    >
+      <NoiseSVG />
+      <GridDots />
+      <ScanLine />
+      <GlowOrb color="#FF6B35" size={460} top="-8%" left="-6%" />
+      <GlowOrb color="#FF8A50" size={340} top="50%" left="60%" delay={2} />
 
-        <div className="tk-wrap">
-          <div className="tk-icon">✓</div>
-          <h1 className="tk-title">Document <span>Uploaded!</span></h1>
-          <p className="tk-sub">Your secure printing session is ready</p>
+      {/* System tag */}
+      <div className="absolute top-7 left-8 flex items-center gap-2">
+        <Cpu className="w-3.5 h-3.5 opacity-40 text-[#FF6B35]" />
+        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+          PrivyPrint OS v4.2
+        </span>
+      </div>
 
-          <div className="tk-card">
-            <div className="tk-card-body">
+      {/* Back Button */}
+      <motion.button
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        onClick={() => navigate("/")}
+        className="absolute top-7 right-8 flex items-center gap-2 text-white/20 hover:text-[#FF6B35] transition-colors group"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+        <span className="text-[9px] font-black tracking-[0.45em] uppercase">
+          Done
+        </span>
+      </motion.button>
 
-              <div className="tk-token-box">
-                <div className="tk-token-label">🔑 Secure Access Token</div>
-                <div className="tk-token-value">{token}</div>
-                <div className="tk-badges">
-                  <span className="tk-badge">Mode: {type}</span>
-                  <span className="tk-badge">
-                    <span className="tk-badge-dot" />
-                    Waiting
-                  </span>
-                </div>
-              </div>
-
-              <div className="tk-qr-wrap">
-                <div className="tk-qr">
-                  <div className="tk-qr-grid">
-                    {QR_PATTERN.map((on, i) => (
-                      <div
-                        key={i}
-                        className="tk-qr-cell"
-                        style={{ background: on ? 'rgba(56,139,253,0.7)' : 'transparent' }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <span className="tk-qr-label">Scan at Kiosk</span>
-              </div>
-
-              <div className="tk-divider" />
-
-              <div className="tk-btn-group">
-                <button className="tk-btn-primary" onClick={() => window.print()}>
-                  📥 &nbsp; Download Slip
-                </button>
-                <button className="tk-btn-secondary" onClick={() => navigate('/')}>
-                  ✅ &nbsp; Done
-                </button>
-              </div>
-
-              <div className="tk-warning">
-                ⚠️ &nbsp; Token expires in <strong>&nbsp;10 min&nbsp;</strong> · Do not share this code
-              </div>
-
-            </div>
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-md"
+      >
+        {/* Success Indicator */}
+        <div className="flex flex-col items-center mb-8">
+          <div className={`w-16 h-16 flex items-center justify-center border ${expired ? 'border-red-400/30 bg-red-400/10' : 'border-green-400/30 bg-green-400/10'} mb-5`}>
+            {expired ? (
+              <AlertTriangle className="w-7 h-7 text-red-400" />
+            ) : (
+              <CheckCircle className="w-7 h-7 text-green-400" />
+            )}
+          </div>
+          <div className={`px-5 py-2 border ${expired ? 'border-red-400/20 bg-red-400/5' : 'border-green-400/20 bg-green-400/5'}`}>
+            <span className={`text-[9px] font-black tracking-[0.55em] uppercase ${expired ? 'text-red-400/80' : 'text-green-400/80'}`}>
+              {expired ? "Session Expired" : "File Uploaded Securely"}
+            </span>
           </div>
         </div>
-      </div>
-    </>
+
+        <h1 className="text-5xl font-black tracking-tighter text-white uppercase text-center mb-2">
+          Secure <span className="text-[#FF6B35]">Session</span>
+        </h1>
+
+        <div className="relative backdrop-blur-xl border rounded-2xl p-6 bg-white/5 border-white/10 shadow-2xl">
+          <div className="relative z-10 flex flex-col gap-6">
+            {/* Token Display Area - Hidden when expired */}
+            {!expired && (
+              <div className="relative p-5 border border-[#FF6B35]/15 bg-[#050505] rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-[#FF6B35]/60" />
+                    <span className="text-[9px] font-black tracking-[0.5em] text-[#FF6B35]/50 uppercase">
+                      Secure Access Token
+                    </span>
+                  </div>
+                  <button onClick={handleCopyToken} className="text-[#FF6B35]">
+                    {copied ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="text-5xl font-black tracking-[0.2em] text-white text-center py-3">
+                  {token}
+                </div>
+
+                <div className="flex justify-center gap-3 mt-3">
+                  <div className="px-3 py-1 border border-white/10 bg-white/4 text-[9px] font-black text-white/40 uppercase">
+                    Mode: {type}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* QR + Kiosk Label - Hidden when expired */}
+            {!expired && (
+              <div className="flex flex-col items-center gap-2">
+                <QRMosaic seed={token.charCodeAt(0)} token={token} />
+                <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+                  Scan at Kiosk
+                </span>
+              </div>
+            )}
+
+            <Countdown navigate={navigate} onExpired={() => setExpired(true)} />
+
+            {/* Voice Print Shortcut - Hidden when expired */}
+            {!expired && (
+              <motion.button
+                whileHover={{
+                  scale: 1.02,
+                  backgroundColor: "rgba(255, 107, 53, 0.1)",
+                }}
+                onClick={() => navigate("/voice-print")}
+                className="w-full p-4 rounded-xl border-2 border-dashed border-[#FF6B35]/30 bg-[#FF6B35]/5 flex flex-col items-center gap-1"
+              >
+                <div className="flex items-center gap-2 text-[#FF6B35]">
+                  <Mic className="w-4 h-4 animate-pulse" />
+                  <span className="font-bold text-xs uppercase tracking-widest">
+                    Try Voice Print
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500 italic">
+                  Say: "Print token {token}"
+                </p>
+              </motion.button>
+            )}
+
+            {/* Final Actions - Hidden when expired */}
+            {!expired && (
+              <div className="flex flex-col gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => window.print()}
+                  className="w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm bg-gradient-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-2 rounded-lg"
+                >
+                  <Download className="w-4 h-4" /> Download Slip
+                </motion.button>
+
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-full py-3.5 border border-white/10 text-white/30 hover:text-[#FF6B35] transition-all text-[10px] font-black uppercase tracking-[0.35em]"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
