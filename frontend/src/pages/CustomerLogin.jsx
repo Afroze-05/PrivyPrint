@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { api } from "../services/api";
-import { setAuth } from "../services/authStorage";
+import { setAuth, getAuth } from "../services/authStorage";
 import { LogIn, Mail, Lock, ArrowRight, ShieldCheck, FileText } from "lucide-react";
 
 export default function CustomerLogin() {
@@ -18,8 +18,18 @@ export default function CustomerLogin() {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", { email, password });
+      console.log("Customer login response:", res.data);
       const { token, user } = res.data;
-      setAuth({ token, user });
+      console.log("User role:", user.role);
+      
+      const authData = { token, user };
+      console.log("Storing auth data:", authData);
+      setAuth(authData);
+      
+      // Verify it was stored
+      const storedAuth = getAuth();
+      console.log("Stored auth verification:", storedAuth);
+      
       navigate("/upload");
     } catch (err) {
       console.log("Login error:", err.response?.data || err.message);
