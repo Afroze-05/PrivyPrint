@@ -17,7 +17,6 @@ import VerifyOtp from "./pages/VerifyOtp"; // Added back
 import RatingThankYou from "./pages/RatingThankYou";
 import RatingPage from "./pages/RatingPage";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import ThemeToggle from "./components/ThemeToggle";
 import VoicePrint from "./pages/VoicePrint";
 import VoiceRequestsPage from "./pages/Admin/VoiceRequestsPage";
 import "./App.css";
@@ -27,7 +26,6 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <ThemeToggle />
         <Routes>
           <Route
             path="/admin/voice-requests"
