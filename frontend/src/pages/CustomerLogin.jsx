@@ -30,7 +30,7 @@ export default function CustomerLogin() {
       const storedAuth = getAuth();
       console.log("Stored auth verification:", storedAuth);
       
-      navigate("/upload");
+      navigate("/dashboard");
     } catch (err) {
       console.log("Login error:", err.response?.data || err.message);
       setError(err.response?.data?.message || "Invalid credentials");

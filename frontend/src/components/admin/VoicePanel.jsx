@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { getAuth } from "../../services/authStorage";
 import { api } from "../../services/api";
+import { findToken, updateTokenStatus } from "../../services/tokenStorage";
 
 export default function VoicePanel() {
   const [voiceHistory, setVoiceHistory] = useState([]);
@@ -32,7 +33,7 @@ export default function VoicePanel() {
     fetchVoiceHistory();
   }, []);
 
-  // Verify token
+  // Verify token using shared storage
   const verifyToken = async () => {
     if (!tokenInput.trim()) return;
     
@@ -40,16 +41,35 @@ export default function VoicePanel() {
     setVerificationResult(null);
     
     try {
-      const res = await api.post("/voice/verify-token", { 
-        token: tokenInput.trim() 
-      });
+      // First check local shared storage for immediate response
+      const localToken = findToken(tokenInput.trim());
       
-      setVerificationResult(res.data);
+      if (localToken) {
+        setVerificationResult({
+          verified: true,
+          message: "Token found in local storage",
+          documentData: {
+            user: {
+              name: "Customer",
+              email: "customer@example.com"
+            },
+            type: localToken.printType || "Unknown",
+            status: localToken.status
+          }
+        });
+      } else {
+        // Fallback to API verification
+        const res = await api.post("/voice/verify-token", { 
+          token: tokenInput.trim() 
+        });
+        
+        setVerificationResult(res.data);
+      }
     } catch (err) {
       console.error("Token verification failed:", err);
       setVerificationResult({
-        error: "Verification failed",
-        message: err.response?.data?.error || "Could not verify token. Please try again."
+        verified: false,
+        message: err.response?.data?.error || "Invalid Token"
       });
     } finally {
       setVerifying(false);

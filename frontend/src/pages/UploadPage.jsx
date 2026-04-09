@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, authHeader } from "../services/api";
 import { getAuth } from "../services/authStorage";
-import { setCustomerToken } from "../services/customerTokenStorage";
+import { addToken } from "../services/tokenStorage";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -59,14 +59,22 @@ const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
   />
 );
 
+// Generate 5-character token function
+function generateToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let token = "";
+  for (let i = 0; i < 5; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
 export default function UploadPage() {
   const navigate = useNavigate();
   const auth = useMemo(() => getAuth(), []);
   const fileInputRef = useRef(null);
 
   const [files, setFiles] = useState([]);
-  const [type, setType] = useState("B/W");
-  const [copies, setCopies] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -88,7 +96,12 @@ export default function UploadPage() {
     setDragOver(false);
     const droppedFiles = Array.from(e.dataTransfer?.files || []);
     if (droppedFiles.length > 0) {
-      setFiles(prevFiles => [...prevFiles, ...droppedFiles]);
+      const formattedFiles = droppedFiles.map(file => ({
+        file,
+        printType: "B/W",
+        copies: 1
+      }));
+      setFiles(prevFiles => [...prevFiles, ...formattedFiles]);
     }
   }
 
@@ -96,114 +109,81 @@ export default function UploadPage() {
     setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   }
 
+  const updatePrintType = (index, value) => {
+    const updated = [...files];
+    updated[index].printType = value;
+    setFiles(updated);
+  };
+
+  const updateCopies = (index, value) => {
+    const updated = [...files];
+    updated[index].copies = parseInt(value) || 1;
+    setFiles(updated);
+  };
+
   function handleFileSelect(e) {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length > 0) {
-      setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+      const formattedFiles = selectedFiles.map(file => ({
+        file,
+        printType: "B/W",
+        copies: 1
+      }));
+      setFiles(prevFiles => [...prevFiles, ...formattedFiles]);
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    setUploadProgress(0);
+  const handleGenerateToken = async () => {
+  try {
+    if (!files || files.length === 0) {
+      alert("Please upload at least one file first");
+      return;
+    }
+
+    if (!auth?.token) {
+      alert("Authentication required. Please login again.");
+      return;
+    }
+
+    const token = generateToken();
+    console.log("Generating token:", token);
+    console.log("Uploading", files.length, "files with individual print options");
+
+    const formData = new FormData();
     
-    console.log("Starting multiple file upload...");
+    // Append all files with their individual options
+    files.forEach((fileItem, index) => {
+      formData.append("files", fileItem.file);
+      formData.append(`printType_${index}`, fileItem.printType);
+      formData.append(`copies_${index}`, String(fileItem.copies));
+    });
+    
+    formData.append("token", token);
+    formData.append("totalFiles", String(files.length));
 
-    // Clear any existing timer state for fresh session
-    localStorage.removeItem('tokenTimerStart');
-    localStorage.removeItem('tokenDuration');
+    const res = await api.post("/api/documents", formData, {
+      headers: authHeader(auth.token),
+    });
 
-    if (!auth?.token) throw new Error("Missing authentication token.");
-    if (files.length === 0) throw new Error("Please select at least one PDF or image file.");
+    console.log("Upload successful:", res.data);
 
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => Math.min(prev + (100 / files.length) / 10, 90));
-    }, 100);
+    // Store token locally with summary information
+    localStorage.setItem("customerToken", JSON.stringify({
+      token: token,
+      status: "waiting",
+      totalFiles: files.length
+    }));
 
-    try {
-      // Upload files one by one
-      const uploadedTokens = [];
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        console.log(`Uploading file ${i + 1}/${files.length}:`, file.name);
+    console.log("Token stored in localStorage, navigating to /token");
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("type", type);
-        formData.append("copies", String(copies));
+    // Navigate to TokenPage
+    navigate("/token");
 
-        const res = await api.post("/upload", formData, {
-          headers: authHeader(auth.token),
-        });
-
-        console.log(`File ${i + 1} uploaded successfully!`, res.data);
-        
-        // Store token for this file
-        const { token, expiresAt, status } = res.data;
-        uploadedTokens.push({ token, file: file.name, expiresAt, status: status || "waiting" });
-      }
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // For now, use the first token as the main token (you can modify this logic later)
-      const mainToken = uploadedTokens[0];
-      setGeneratedToken(mainToken.token);
-      
-      console.log("All files uploaded successfully!");
-
-      setTimeout(() => {
-        setUploadSuccess(true);
-        setLoading(false);
-        setIsUploaded(true);
-        
-        setCustomerToken({ 
-          token: mainToken.token, 
-          expiresAt: mainToken.expiresAt, 
-          status: mainToken.status 
-        });
-        localStorage.setItem("printType", type);
-        
-        console.log("Tokens stored, showing modal...");
-        
-        // Show success modal after a short delay
-        setTimeout(() => {
-          setShowSuccessModal(true);
-          console.log("Success modal should be visible now");
-        }, 200);
-      }, 500);
-    } catch (err) {
-      clearInterval(progressInterval);
-      setUploadProgress(0);
-      
-      // Better error handling with specific messages
-      let errorMessage = "Upload failed. Please try again.";
-      
-      if (err?.response?.status === 413) {
-        errorMessage = "One or more files are too large. Please choose smaller files.";
-      } else if (err?.response?.status === 400) {
-        errorMessage = "Invalid file format. Please use PDF or image files.";
-      } else if (err?.response?.status === 401) {
-        errorMessage = "Authentication expired. Please login again.";
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      setLoading(false);
-      setFiles([]); // Reset files on error
-      setUploadProgress(0); // Reset progress
-      // Ensure user cannot proceed to token page on error
-      setIsUploaded(false);
-      setUploadSuccess(false);
-      setShowSuccessModal(false);
-    }
+  } catch (err) {
+    console.error("Token generation failed:", err);
+    alert("Something went wrong: " + (err.response?.data?.message || err.message));
   }
+};
 
   return (
     <div
@@ -476,77 +456,84 @@ export default function UploadPage() {
                   </div>
                 </div>
 
-                {/* File List */}
+                {/* File List with Per-File Options */}
                 {files.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-sm font-medium text-gray-400 mb-3">Selected Files:</h3>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {files.map((file, index) => (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {files.map((fileItem, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg"
+                          className="p-4 bg-[#1a1a1a] border border-white/10 rounded-xl"
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-2 h-2 bg-[#FF6B35] rounded-full flex-shrink-0"></div>
-                            <span className="text-sm text-gray-300 truncate">
-                              {file.name}
-                            </span>
-                            <span className="text-xs text-gray-500 flex-shrink-0">
-                              ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                            </span>
+                          {/* File Info Header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="w-2 h-2 bg-[#FF6B35] rounded-full flex-shrink-0"></div>
+                              <span className="text-sm text-gray-300 truncate font-medium">
+                                {fileItem.file.name}
+                              </span>
+                              <span className="text-xs text-gray-500 flex-shrink-0">
+                                ({(fileItem.file.size / 1024 / 1024).toFixed(2)} MB)
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(index);
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeFile(index);
-                            }}
-                            className="p-1 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                          
+                          {/* Per-File Print Options */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Print Type */}
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">
+                                Print Type
+                              </label>
+                              <select
+                                value={fileItem.printType}
+                                onChange={(e) => updatePrintType(index, e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                              >
+                                <option value="B/W" className="bg-gray-900">Black & White</option>
+                                <option value="Color" className="bg-gray-900">Color</option>
+                              </select>
+                            </div>
+                            
+                            {/* Copies */}
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">
+                                Copies
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={fileItem.copies}
+                                onChange={(e) => updateCopies(index, e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                              />
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  {["B/W", "Color"].map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setType(opt)}
-                      className={`p-4 rounded-xl border transition-all ${type === opt ? "bg-[#FF6B35] border-[#FF6B35] text-white" : "bg-white/5 border-white/10 text-gray-400"}`}
-                    >
-                      <Printer className="w-4 h-4 mx-auto mb-2" />
-                      <span className="text-xs font-bold uppercase">{opt}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mb-8">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">
-                    Copies
-                  </label>
-                  <div className="relative">
-                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="number"
-                      min={1}
-                      value={copies}
-                      onChange={(e) => setCopies(parseInt(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-[#FF6B35]"
-                    />
-                  </div>
-                </div>
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleGenerateToken}
                   disabled={loading || files.length === 0}
                   className="w-full bg-[#FF6B35] hover:bg-[#FF8A50] disabled:opacity-50 py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all"
                 >
-                  {loading ? "Processing..." : `Secure Upload${files.length > 1 ? ` (${files.length} files)` : ''}`}
+                  {loading ? "Generating Token..." : "Generate Token"}
                   {!loading && <ChevronRight className="w-5 h-5" />}
                 </button>
               </div>

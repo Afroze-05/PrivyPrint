@@ -4,6 +4,7 @@ import { Camera, ShieldCheck, AlertTriangle, LayoutDashboard, Printer,
   FileText, Clock, Cpu, ChevronRight, CheckCircle, XCircle, Eye, Key, Search, Filter, ZoomIn, ZoomOut, RotateCw, Download } from "lucide-react";
 import { api, apiBaseUrl, authHeader } from "../../services/api";
 import { getAuth, setAuth } from "../../services/authStorage";
+import { findToken, updateTokenStatus } from "../../services/tokenStorage";
 import CameraPermissionModal from "../../components/CameraPermissionModal";
 import SecurityOverlay from "../../components/SecurityOverlay";
 import PhoneDetection from "../../components/security/PhoneDetection";
@@ -351,6 +352,33 @@ export default function AdminPrintPanel() {
     if (!token) { setError("Token is required."); return; }
     const currentAuth = getAuth();
     if (!currentAuth?.token) { navigate("/admin/login"); return; }
+    
+    // First check shared storage for token (case-insensitive)
+    const match = findToken(token);
+    
+    if (match) {
+      console.log('🔍 AdminPrintPanel - Token found in shared storage:', match);
+      setDoc({
+        token: match.token,
+        fileUrl: `/uploads/${match.fileName}`,
+        fileName: match.fileName,
+        type: localStorage.getItem("printType") || "B/W",
+        status: match.status,
+        customerEmail: "customer@example.com",
+        customerName: "Customer"
+      });
+      
+      setFileType(localStorage.getItem("printType") || "B/W");
+      setIsGrayscale((localStorage.getItem("printType") || "B/W") === "B/W");
+      setOriginalImageUrl(`${apiBaseUrl}/uploads/${match.fileName}`);
+      setWatermarkTime(new Date());
+      setSecondsLeft(120);
+      setIntervalActive(true);
+      setLoadingDoc(false);
+      return;
+    }
+    
+    // If not found locally, check backend
     setLoadingDoc(true);
     try {
       const res = await fetch("http://localhost:5000/api/verify-token", {
@@ -368,7 +396,7 @@ export default function AdminPrintPanel() {
       }
       
       const data = await res.json();
-      console.log('🔍 AdminPrintPanel - Token verified:', data);
+      console.log('🔍 AdminPrintPanel - Token verified from backend:', data);
       setDoc(data);
       
       // Set file type and determine if grayscale should be applied
@@ -409,6 +437,10 @@ export default function AdminPrintPanel() {
     
     try {
       await api.post(`/print/${encodeURIComponent(doc.token)}`, null, { headers: authHeader(currentAuth.token) });
+      
+      // Update token status to completed
+      updateTokenStatus(doc.token, 'completed');
+      
       const today = new Date().toISOString().split("T")[0];
       const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
       const dayStats = allStats[today] || { bw: 0, color: 0, total: 0 };
@@ -641,7 +673,7 @@ export default function AdminPrintPanel() {
                     icon={Key}
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="SPX-1234"
+                    placeholder="A9X2B"
                     disabled={isPrinting}
                     accent="#FF6B35"
                   />
