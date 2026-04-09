@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion);
 import {
   CheckCircle,
   Cpu,
@@ -14,7 +13,6 @@ import {
   Check,
   Mic,
 } from "lucide-react";
-import { getCustomerToken } from "../services/customerTokenStorage";
 
 /* ── Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -202,24 +200,19 @@ const Countdown = ({ navigate, onExpired }) => {
 
 export default function TokenPage() {
   const navigate = useNavigate();
-  const customerToken = getCustomerToken();
+  const customerToken = JSON.parse(localStorage.getItem("customerToken"));
   const token = customerToken?.token || "A9X2B";
   const type = localStorage.getItem("printType") || "B/W";
   const [copied, setCopied] = useState(false);
   const [expired, setExpired] = useState(false);
 
+  console.log("Token received:", customerToken);
+
   // Check if token exists, if not redirect to upload
   useEffect(() => {
-    if (!customerToken?.token) {
+    if (!customerToken || !customerToken.token) {
+      console.log("No token found, redirecting to upload...");
       navigate("/upload");
-      return;
-    }
-    
-    // Additional check: ensure token was generated from a successful upload
-    const uploadStatus = customerToken?.status;
-    if (!uploadStatus || (uploadStatus !== "waiting" && uploadStatus !== "processing" && uploadStatus !== "completed")) {
-      navigate("/upload");
-      return;
     }
   }, [customerToken, navigate]);
 

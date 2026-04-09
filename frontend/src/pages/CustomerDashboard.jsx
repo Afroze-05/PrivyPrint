@@ -41,7 +41,7 @@ export default function CustomerDashboard() {
     { id: 2, file: "presentation.pptx", date: "2024-04-07", status: "pending" },
     { id: 3, file: "notes.docx", date: "2024-04-06", status: "completed" }
   ]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [printOptions, setPrintOptions] = useState({
     color: false,
     copies: 1
@@ -75,10 +75,7 @@ export default function CustomerDashboard() {
   }, []);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+    setFiles(Array.from(e.target.files));
   };
 
   const handleDragOver = (e) => {
@@ -93,18 +90,29 @@ export default function CustomerDashboard() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      setSelectedFile(file);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      setFiles(droppedFiles);
     }
   };
 
-  // Token generation is now handled in UploadPage.jsx with standardized format
   const handleGenerateToken = () => {
-    if (selectedFile) {
-      // Navigate to upload page where token generation happens
-      navigate("/upload");
+    if (files.length === 0) {
+      alert("Please upload at least one file");
+      return;
     }
+    const token = Math.random().toString(36).substring(2, 7).toUpperCase();
+    
+    // STORE TOKEN BEFORE NAVIGATION (VERY IMPORTANT)
+    localStorage.setItem("customerToken", JSON.stringify({
+      token: token,
+      status: "waiting"
+    }));
+
+    console.log("Token stored:", token);
+
+    // NAVIGATE TO TOKEN PAGE
+    navigate("/token");
   };
 
   const handleLogout = () => {
@@ -194,8 +202,8 @@ export default function CustomerDashboard() {
           {activePage === "dashboard" && <DashboardHome stats={stats} liveStatus={liveStatus} history={history} navigate={navigate} />}
           {activePage === "upload" && (
             <UploadPage 
-              selectedFile={selectedFile}
-              setSelectedFile={setSelectedFile}
+              files={files}
+              setFiles={setFiles}
               printOptions={printOptions}
               setPrintOptions={setPrintOptions}
               handleFileChange={handleFileChange}
@@ -353,8 +361,8 @@ function DashboardHome({ stats, liveStatus, history, navigate }) {
 
 // Upload Page Component
 function UploadPage({ 
-  selectedFile, 
-  setSelectedFile, 
+  files, 
+  setFiles, 
   printOptions, 
   setPrintOptions, 
   handleFileChange, 
@@ -385,10 +393,11 @@ function UploadPage({
             }`}
           >
             <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400 mb-2">Drag and drop your file here, or</p>
+            <p className="text-gray-400 mb-2">Drag and drop your files here, or</p>
             <label className="inline-block">
               <input
                 type="file"
+                multiple
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -399,24 +408,29 @@ function UploadPage({
             <p className="text-sm text-gray-500 mt-2">PDF, DOC, DOCX, PPT, PPTX (Max 10MB)</p>
           </div>
 
-          {/* Selected File Display */}
-          {selectedFile && (
-            <div className="bg-[#0f0f0f] rounded-lg p-4 border border-gray-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-[#ff6b00]" />
-                  <div>
-                    <p className="text-white font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-gray-400">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+          {/* Selected Files Display */}
+          {files.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-gray-400 font-medium">Selected Files ({files.length})</h4>
+              {files.map((file, index) => (
+                <div key={index} className="bg-[#0f0f0f] rounded-lg p-4 border border-gray-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-[#ff6b00]" />
+                      <div>
+                        <p className="text-white font-medium">{file.name}</p>
+                        <p className="text-sm text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
+                      className="text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  className="text-gray-400 hover:text-red-400 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              ))}
             </div>
           )}
 
@@ -482,14 +496,14 @@ function UploadPage({
           {/* Generate Token Button */}
           <button
             onClick={generateToken}
-            disabled={!selectedFile}
+            disabled={files.length === 0}
             className={`w-full py-3 rounded-lg font-medium transition-all ${
-              selectedFile
+              files.length > 0
                 ? 'bg-[#ff6b00] text-white hover:bg-[#ff8c00] hover:shadow-lg hover:shadow-[#ff6b00]/20'
                 : 'bg-gray-800 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {selectedFile ? 'Generate Token' : 'Select a file to continue'}
+            {files.length > 0 ? 'Generate Token' : 'Select files to continue'}
           </button>
         </div>
       </div>
