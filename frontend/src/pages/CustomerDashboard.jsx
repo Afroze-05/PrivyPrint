@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllTokens, addToken } from "../services/tokenStorage";
+import { getAllTokens } from "../services/tokenStorage";
 import { 
   LayoutDashboard, 
   Upload, 
@@ -41,11 +41,6 @@ export default function CustomerDashboard() {
     { id: 2, file: "presentation.pptx", date: "2024-04-07", status: "pending" },
     { id: 3, file: "notes.docx", date: "2024-04-06", status: "completed" }
   ]);
-  const [files, setFiles] = useState([]);
-  const [printOptions, setPrintOptions] = useState({
-    color: false,
-    copies: 1
-  });
 
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -56,7 +51,6 @@ export default function CustomerDashboard() {
     { id: "profile", label: "Profile", icon: User }
   ];
 
-  const [isDragging, setIsDragging] = useState(false);
 
   // Update live status from shared token storage
   useEffect(() => {
@@ -74,59 +68,6 @@ export default function CustomerDashboard() {
     }
   }, []);
 
-  const handleFileChange = (e) => {
-    setFiles(Array.from(e.target.files));
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-      setFiles(droppedFiles);
-    }
-  };
-
-  const handleGenerateToken = () => {
-    if (files.length === 0) {
-      alert("Please upload at least one file");
-      return;
-    }
-    
-    // Standardized token generation
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let tokenValue = "SPX-";
-    for (let i = 0; i < 5; i++) {
-      tokenValue += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    
-    const tokenData = {
-      token: tokenValue,
-      status: "waiting",
-      createdAt: Date.now(),
-      fileName: files[0].name // Simplified for local storage
-    };
-
-    // STORE TOKEN BEFORE NAVIGATION (VERY IMPORTANT)
-    localStorage.setItem("customerToken", JSON.stringify(tokenData));
-    
-    // SHARE TOKEN WITH ADMIN (VERY IMPORTANT)
-    addToken(tokenData);
-
-    console.log("Token stored:", tokenValue);
-
-    // NAVIGATE TO TOKEN PAGE
-    navigate("/token");
-  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -164,7 +105,11 @@ export default function CustomerDashboard() {
               <button
                 key={item.id}
                 onClick={() => {
-                  setActivePage(item.id);
+                  if (item.id === "upload") {
+                    navigate("/upload");
+                  } else {
+                    setActivePage(item.id);
+                  }
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-all duration-200 ${
@@ -213,21 +158,7 @@ export default function CustomerDashboard() {
         {/* Content Area */}
         <div className="p-8">
           {activePage === "dashboard" && <DashboardHome stats={stats} liveStatus={liveStatus} history={history} navigate={navigate} />}
-          {activePage === "upload" && (
-            <UploadPage 
-              files={files}
-              setFiles={setFiles}
-              printOptions={printOptions}
-              setPrintOptions={setPrintOptions}
-              handleFileChange={handleFileChange}
-              handleDragOver={handleDragOver}
-              handleDragLeave={handleDragLeave}
-              handleDrop={handleDrop}
-              isDragging={isDragging}
-              generateToken={handleGenerateToken}
-            />
-          )}
-          {activePage === "history" && <HistoryPage history={history} />}
+                    {activePage === "history" && <HistoryPage history={history} />}
           {activePage === "notifications" && <NotificationsPage />}
           {activePage === "wallet" && <WalletPage />}
           {activePage === "profile" && <ProfilePage />}
@@ -372,157 +303,6 @@ function DashboardHome({ stats, liveStatus, history, navigate }) {
   );
 }
 
-// Upload Page Component
-function UploadPage({ 
-  files, 
-  setFiles, 
-  printOptions, 
-  setPrintOptions, 
-  handleFileChange, 
-  handleDragOver, 
-  handleDragLeave, 
-  handleDrop, 
-  isDragging, 
-  generateToken 
-}) {
-  return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-8">
-        <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-[#ff6b00]" />
-          Upload New Document
-        </h3>
-        
-        <div className="space-y-6">
-          {/* Drag & Drop Area */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-              isDragging 
-                ? 'border-[#ff6b00] bg-[#ff6b00]/5' 
-                : 'border-gray-700 bg-[#0f0f0f] hover:border-gray-600'
-            }`}
-          >
-            <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400 mb-2">Drag and drop your files here, or</p>
-            <label className="inline-block">
-              <input
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <span className="px-4 py-2 bg-[#ff6b00] text-white rounded-lg hover:bg-[#ff8c00] transition-colors cursor-pointer">
-                Browse Files
-              </span>
-            </label>
-            <p className="text-sm text-gray-500 mt-2">PDF, DOC, DOCX, PPT, PPTX (Max 10MB)</p>
-          </div>
-
-          {/* Selected Files Display */}
-          {files.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-gray-400 font-medium">Selected Files ({files.length})</h4>
-              {files.map((file, index) => (
-                <div key={index} className="bg-[#0f0f0f] rounded-lg p-4 border border-gray-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-[#ff6b00]" />
-                      <div>
-                        <p className="text-white font-medium">{file.name}</p>
-                        <p className="text-sm text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
-                      className="text-gray-400 hover:text-red-400 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Print Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Print Type
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPrintOptions(prev => ({ ...prev, color: false }))}
-                  className={`flex-1 py-2 px-4 rounded-lg border transition-all ${
-                    !printOptions.color
-                      ? 'bg-[#ff6b00] text-white border-[#ff6b00]'
-                      : 'bg-[#0f0f0f] text-gray-400 border-gray-700 hover:border-gray-600'
-                  }`}
-                >
-                  Black & White
-                </button>
-                <button
-                  onClick={() => setPrintOptions(prev => ({ ...prev, color: true }))}
-                  className={`flex-1 py-2 px-4 rounded-lg border transition-all ${
-                    printOptions.color
-                      ? 'bg-[#ff6b00] text-white border-[#ff6b00]'
-                      : 'bg-[#0f0f0f] text-gray-400 border-gray-700 hover:border-gray-600'
-                  }`}
-                >
-                  Color
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Number of Copies
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={printOptions.copies}
-                onChange={(e) => setPrintOptions(prev => ({ 
-                  ...prev, 
-                  copies: parseInt(e.target.value) || 1 
-                }))}
-                className="w-full px-4 py-2 bg-[#0f0f0f] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#ff6b00] transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Suggestion Box */}
-          <div className="bg-[#ff6b00]/10 border border-[#ff6b00]/20 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="text-[#ff6b00] text-lg">💡</div>
-              <div>
-                <p className="text-white font-medium">Cost Saving Tip</p>
-                <p className="text-gray-300 text-sm mt-1">Use Black & White to save up to 60% on printing costs</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Generate Token Button */}
-          <button
-            onClick={generateToken}
-            disabled={files.length === 0}
-            className={`w-full py-3 rounded-lg font-medium transition-all ${
-              files.length > 0
-                ? 'bg-[#ff6b00] text-white hover:bg-[#ff8c00] hover:shadow-lg hover:shadow-[#ff6b00]/20'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {files.length > 0 ? 'Generate Token' : 'Select files to continue'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // History Page Component
 function HistoryPage({ history }) {
