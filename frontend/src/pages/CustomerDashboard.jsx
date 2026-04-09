@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllTokens } from "../services/tokenStorage";
+import { getAllTokens, addToken } from "../services/tokenStorage";
 import { 
   LayoutDashboard, 
   Upload, 
@@ -101,15 +101,28 @@ export default function CustomerDashboard() {
       alert("Please upload at least one file");
       return;
     }
-    const token = Math.random().toString(36).substring(2, 7).toUpperCase();
     
-    // STORE TOKEN BEFORE NAVIGATION (VERY IMPORTANT)
-    localStorage.setItem("customerToken", JSON.stringify({
-      token: token,
-      status: "waiting"
-    }));
+    // Standardized token generation
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let tokenValue = "SPX-";
+    for (let i = 0; i < 5; i++) {
+      tokenValue += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    const tokenData = {
+      token: tokenValue,
+      status: "waiting",
+      createdAt: Date.now(),
+      fileName: files[0].name // Simplified for local storage
+    };
 
-    console.log("Token stored:", token);
+    // STORE TOKEN BEFORE NAVIGATION (VERY IMPORTANT)
+    localStorage.setItem("customerToken", JSON.stringify(tokenData));
+    
+    // SHARE TOKEN WITH ADMIN (VERY IMPORTANT)
+    addToken(tokenData);
+
+    console.log("Token stored:", tokenValue);
 
     // NAVIGATE TO TOKEN PAGE
     navigate("/token");

@@ -37,28 +37,47 @@ async function markExpiredIfNeeded(doc) {
 }
 
 async function getDocumentForVerification(token) {
-  console.log(`🔍 Document verification - Looking for token: ${token}`);
+  const searchToken = token ? token.toUpperCase().trim() : token;
+  console.log(`🔍 Searching token in Documents collection: "${searchToken}"`);
+  console.log(`Original token: "${token}"`);
+  console.log(`Processed token: "${searchToken}"`);
+  console.log(`Search regex: ^${searchToken}$ (case-insensitive)`);
+
   // Case-insensitive token search - convert to uppercase for matching
-  const searchToken = token ? token.toUpperCase() : token;
-  const doc = await Document.findOne({ token: { $regex: new RegExp(`^${searchToken}$`, 'i') } }).populate("userId", "email name role");
+  const doc = await Document.findOne({ 
+    token: { $regex: new RegExp(`^${searchToken}$`, 'i') } 
+  }).populate("userId", "email name role");
+
+  console.log(`MongoDB query executed...`);
+  
   if (!doc) {
-    console.log(`❌ Document verification - Token not found: ${token}`);
+    console.log(`❌ Token Not Found in Documents collection: "${searchToken}"`);
+    
+    // Additional debug: Check if any similar tokens exist
+    const allDocs = await Document.find({}).select('token status').limit(10);
+    console.log(`Existing tokens in database (first 10):`);
+    allDocs.forEach(d => console.log(`  - "${d.token}" (status: ${d.status})`));
+    
     return { ok: false, statusCode: 404, message: "Token not found." };
   }
 
+  console.log(`✅ Token Found: "${doc.token}", status: ${doc.status}`);
+  console.log(`Document fileUrl: ${doc.fileUrl}`);
+  console.log(`Document userId: ${doc.userId?._id}`);
+  
   await markExpiredIfNeeded(doc);
 
   if (doc.status === "expired") {
-    console.log(`❌ Document verification - Token expired: ${token}`);
+    console.log(`❌ Token expired: "${searchToken}"`);
     return { ok: false, statusCode: 410, message: "Token expired." };
   }
 
   if (doc.status === "completed") {
-    console.log(`❌ Document verification - Token already used: ${token}`);
+    console.log(`❌ Token already used: "${searchToken}"`);
     return { ok: false, statusCode: 409, message: "Token already used." };
   }
 
-  console.log(`✅ Document verification - Token valid: ${token}, status: ${doc.status}`);
+  console.log(`✅ Token verification PASSED: "${searchToken}"`);
   return { ok: true, document: doc };
 }
 
@@ -84,7 +103,7 @@ async function uploadDocument(req, res) {
     console.log('🔍 Upload Debug - Single file fallback:', !!req.file);
     
     const { token, totalFiles } = req.body;
-    console.log('🔍 Upload Debug - Request body - token:', token, 'totalFiles:', totalFiles);
+    console.log('🔍 Upload Debug - Request body - token:', token, 'totalFiles:', totalFiles, 'printType:', req.body.printType, 'copies:', req.body.copies);
 
     // Handle both single file and multiple files
     const filesToProcess = req.files && req.files.length > 0 ? req.files : (req.file ? [req.file] : []);
@@ -99,14 +118,17 @@ async function uploadDocument(req, res) {
     // Use frontend-generated token or fallback to generated token
     let documentToken;
     if (token) {
-      console.log('🔍 Using frontend-generated token:', token);
-      // Check if token already exists
-      const existingToken = await Document.exists({ token });
-      if (existingToken) {
+      const searchToken = token.toUpperCase().trim();
+      console.log('🔍 Using frontend-generated token:', searchToken);
+      // Check if token already exists in Documents collection
+      const existingDoc = await Document.findOne({ 
+        token: { $regex: new RegExp(`^${searchToken}$`, 'i') } 
+      });
+      if (existingDoc) {
         console.log('❌ Token already exists, generating new one');
         documentToken = await generateUniqueDocumentToken();
       } else {
-        documentToken = token;
+        documentToken = searchToken;
       }
     } else {
       console.log('🔍 No token provided, generating new one');
@@ -120,11 +142,13 @@ async function uploadDocument(req, res) {
     let totalCopies = 0;
     const createdDocuments = [];
 
-    // Process each file with its individual options
+    // Get printType and copies from request body (assuming single file upload for now)
+    const printType = req.body.printType || "B/W";
+    const copies = req.body.copies || "1";
+
+    // Process each file (currently only one file is expected from frontend)
     for (let i = 0; i < filesToProcess.length; i++) {
       const file = filesToProcess[i];
-      const printType = req.body[`printType_${i}`] || "B/W";
-      const copies = req.body[`copies_${i}`] || "1";
       
       console.log(`🔍 Processing file ${i + 1}:`, file.originalname, 'type:', printType, 'copies:', copies);
       
@@ -169,6 +193,7 @@ async function uploadDocument(req, res) {
       console.log(`📄 Document created for file ${i + 1} with token: ${doc.token}`);
     }
 
+    console.log("Saved Token:", documentToken); // Verification log
     console.log(`📄 All ${createdDocuments.length} documents created with shared token: ${documentToken}`);
     
     const response = {
@@ -198,13 +223,24 @@ async function uploadDocument(req, res) {
 async function getDocumentByToken(req, res) {
   try {
     const { token } = req.params;
+    console.log(`\n=== TOKEN FETCH DEBUG ===`);
+    console.log(`Admin requested token: "${token}"`);
+    console.log(`Token length: ${token?.length}`);
+    console.log(`Token uppercase: "${token?.toUpperCase()}"`);
+    
     const result = await getDocumentForVerification(token);
 
     if (!result.ok) {
+      console.log(`Token fetch FAILED: ${result.message}`);
+      console.log(`=== END TOKEN FETCH DEBUG ===\n`);
       return res.status(result.statusCode).json({ message: result.message });
     }
 
     const doc = result.document;
+    console.log(`Token fetch SUCCESS: Found document with token "${doc.token}"`);
+    console.log(`Document fileUrl: ${doc.fileUrl}`);
+    console.log(`Document status: ${doc.status}`);
+    console.log(`=== END TOKEN FETCH DEBUG ===\n`);
 
     return res.status(200).json({
       token: doc.token,
@@ -219,6 +255,8 @@ async function getDocumentByToken(req, res) {
       customerName: doc.userId?.name,
     });
   } catch (err) {
+    console.log(`Token fetch ERROR: ${err.message}`);
+    console.log(`=== END TOKEN FETCH DEBUG ===\n`);
     return res.status(500).json({ message: "Failed to fetch document.", error: err.message });
   }
 }
@@ -316,9 +354,9 @@ async function simulatePrint(req, res) {
       return res.status(409).json({ message: "Print simulation failed due to state change." });
     }
 
-    // Create enhanced log entry with pricing details
+    // Create enhanced log entry in logs collection
     await Log.create({ 
-      token, 
+      token: completedDoc.token, 
       documentId: completedDoc._id,
       adminId, 
       printType: completedDoc.type,

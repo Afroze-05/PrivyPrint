@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "../services/api"; // Import api service
 import {
   Upload,
   ArrowLeft,
@@ -56,6 +57,8 @@ export default function UploadPage() {
   const fileInputRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [dragOver, setDragOver] = useState(false);
+  const [printType, setPrintType] = useState("B/W"); // Default print type
+  const [copies, setCopies] = useState(1); // Default copies
 
   function handleFileDrop(e) {
     e.preventDefault();
@@ -75,23 +78,57 @@ export default function UploadPage() {
     setFiles(selectedFiles);
   }
 
-  const handleGenerateToken = () => {
+  function generateToken() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let token = "SPX-";
+    for (let i = 0; i < 5; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+  }
+
+  const handleGenerateToken = async () => {
     if (files.length === 0) {
       alert("Please upload at least one file");
       return;
     }
-    const token = Math.random().toString(36).substring(2, 7).toUpperCase();
     
-    // STORE TOKEN BEFORE NAVIGATION (VERY IMPORTANT)
-    localStorage.setItem("customerToken", JSON.stringify({
-      token: token,
-      status: "waiting"
-    }));
+    const tokenValue = generateToken();
+    console.log("Generated Token:", tokenValue);
+    
+    const formData = new FormData();
+    // Fix multiple file upload
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    formData.append("token", tokenValue);
+    formData.append("printType", printType);
+    formData.append("copies", copies);
 
-    console.log("Token stored:", token);
+    try {
+      const response = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-    // NAVIGATE TO TOKEN PAGE
-    navigate("/token");
+      const tokenData = {
+        token: tokenValue,
+        status: "waiting",
+        createdAt: Date.now(),
+        fileName: files[0].name,
+      };
+
+      // Store token properly in localStorage
+      localStorage.setItem("customerToken", JSON.stringify(tokenData));
+      
+      console.log("Token stored and sent to backend:", tokenValue);
+      console.log("Navigating to token page...");
+      navigate("/token");
+    } catch (error) {
+      console.error("Error uploading document and token:", error);
+      alert("Failed to upload document and generate token. Please try again.");
+    }
   };
 
   return (
@@ -198,6 +235,48 @@ export default function UploadPage() {
                 </div>
               </div>
             )}
+
+            {/* Print Options */}
+            <div className="mb-6 p-4 border border-white/10 rounded-xl bg-white/5">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Print Options:</h3>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-white text-sm">
+                  <input
+                    type="radio"
+                    name="printType"
+                    value="B/W"
+                    checked={printType === "B/W"}
+                    onChange={() => setPrintType("B/W")}
+                    className="form-radio text-[#FF6B35]"
+                  />
+                  Black & White
+                </label>
+                <label className="flex items-center gap-2 text-white text-sm">
+                  <input
+                    type="radio"
+                    name="printType"
+                    value="Color"
+                    checked={printType === "Color"}
+                    onChange={() => setPrintType("Color")}
+                    className="form-radio text-[#FF6B35]"
+                  />
+                  Color
+                </label>
+              </div>
+              <div className="mt-4">
+                <label htmlFor="copies" className="block text-white text-sm font-medium mb-2">
+                  Copies:
+                </label>
+                <input
+                  type="number"
+                  id="copies"
+                  value={copies}
+                  onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value)))}
+                  min="1"
+                  className="w-24 p-2 rounded-md bg-[#1a1a1a] border border-white/10 text-white"
+                />
+              </div>
+            </div>
 
             <button
               type="button"
