@@ -3,6 +3,7 @@ import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import CustomerSignup from "./pages/CustomerSignup";
 import CustomerLogin from "./pages/CustomerLogin"; // Added back
+import CustomerDashboard from "./pages/CustomerDashboard";
 import UploadPage from "./pages/UploadPage";
 import TokenPage from "./pages/TokenPage";
 import LoginSelection from "./pages/LoginSelection";
@@ -47,6 +48,14 @@ function App() {
 
           {/* Customer flow */}
           <Route path="/signup" element={<CustomerSignup />} />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <CustomerDashboard />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/upload"
             element={

@@ -203,7 +203,7 @@ const Countdown = ({ navigate, onExpired }) => {
 export default function TokenPage() {
   const navigate = useNavigate();
   const customerToken = getCustomerToken();
-  const token = customerToken?.token || "SPX-0000";
+  const token = customerToken?.token || "A9X2B";
   const type = localStorage.getItem("printType") || "B/W";
   const [copied, setCopied] = useState(false);
   const [expired, setExpired] = useState(false);

@@ -38,7 +38,9 @@ async function markExpiredIfNeeded(doc) {
 
 async function getDocumentForVerification(token) {
   console.log(`🔍 Document verification - Looking for token: ${token}`);
-  const doc = await Document.findOne({ token }).populate("userId", "email name role");
+  // Case-insensitive token search - convert to uppercase for matching
+  const searchToken = token ? token.toUpperCase() : token;
+  const doc = await Document.findOne({ token: { $regex: new RegExp(`^${searchToken}$`, 'i') } }).populate("userId", "email name role");
   if (!doc) {
     console.log(`❌ Document verification - Token not found: ${token}`);
     return { ok: false, statusCode: 404, message: "Token not found." };
@@ -78,72 +80,114 @@ async function uploadDocument(req, res) {
     console.log('🔍 Upload Debug - User authenticated:', !!req.user);
     console.log('🔍 Upload Debug - User ID:', req.user?.id);
     console.log('🔍 Upload Debug - User role:', req.user?.role);
-    console.log('🔍 Upload Debug - File received:', !!req.file);
-    console.log('🔍 Upload Debug - File details:', req.file?.originalname, req.file?.mimetype, req.file?.size);
+    console.log('🔍 Upload Debug - Files received:', req.files?.length || 0);
+    console.log('🔍 Upload Debug - Single file fallback:', !!req.file);
     
-    const { type, copies, pages } = req.body;
-    console.log('🔍 Upload Debug - Request body - type:', type, 'copies:', copies, 'pages:', pages);
+    const { token, totalFiles } = req.body;
+    console.log('🔍 Upload Debug - Request body - token:', token, 'totalFiles:', totalFiles);
 
-    if (!req.file) {
+    // Handle both single file and multiple files
+    const filesToProcess = req.files && req.files.length > 0 ? req.files : (req.file ? [req.file] : []);
+    
+    if (!filesToProcess || filesToProcess.length === 0) {
       console.log('❌ Upload Debug - Missing file upload');
-      return res.status(400).json({ message: "Missing file upload. Use field name `file`." });
+      return res.status(400).json({ message: "Missing file upload. Use field name `files` for multiple files or `file` for single file." });
     }
 
-    const normalizedType =
-      DOCUMENT_TYPE_NORMALIZATION[(type || "").toLowerCase().trim()] || type;
+    console.log('🔍 Upload Debug - Processing', filesToProcess.length, 'files');
 
-    if (!["B/W", "Color"].includes(normalizedType)) {
-      console.log('❌ Upload Debug - Invalid type:', normalizedType);
-      return res.status(400).json({ message: "type must be 'B/W' or 'Color'." });
+    // Use frontend-generated token or fallback to generated token
+    let documentToken;
+    if (token) {
+      console.log('🔍 Using frontend-generated token:', token);
+      // Check if token already exists
+      const existingToken = await Document.exists({ token });
+      if (existingToken) {
+        console.log('❌ Token already exists, generating new one');
+        documentToken = await generateUniqueDocumentToken();
+      } else {
+        documentToken = token;
+      }
+    } else {
+      console.log('🔍 No token provided, generating new one');
+      documentToken = await generateUniqueDocumentToken();
     }
 
-    const parsedCopies = copies ? Number(copies) : 1;
-    const parsedPages = pages ? Number(pages) : 1;
-
-    if (!Number.isFinite(parsedCopies) || parsedCopies < 1) {
-      console.log('❌ Upload Debug - Invalid copies:', parsedCopies);
-      return res.status(400).json({ message: "copies must be a positive number." });
-    }
-
-    if (!Number.isFinite(parsedPages) || parsedPages < 1) {
-      console.log('❌ Upload Debug - Invalid pages:', parsedPages);
-      return res.status(400).json({ message: "pages must be a positive number." });
-    }
-
-    // Calculate price
-    const price = calculatePrice(normalizedType, parsedCopies, parsedPages);
-
-    const token = await generateUniqueDocumentToken();
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + 2 * 60 * 1000); // 2 minutes
+    
+    let totalPrice = 0;
+    let totalCopies = 0;
+    const createdDocuments = [];
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    // Process each file with its individual options
+    for (let i = 0; i < filesToProcess.length; i++) {
+      const file = filesToProcess[i];
+      const printType = req.body[`printType_${i}`] || "B/W";
+      const copies = req.body[`copies_${i}`] || "1";
+      
+      console.log(`🔍 Processing file ${i + 1}:`, file.originalname, 'type:', printType, 'copies:', copies);
+      
+      // Normalize type
+      const normalizedType = DOCUMENT_TYPE_NORMALIZATION[printType.toLowerCase().trim()] || printType;
 
-    const doc = await Document.create({
-      fileUrl,
-      token,
-      type: normalizedType,
-      copies: parsedCopies,
-      pages: parsedPages,
-      price: price,
-      status: "waiting",
-      createdAt,
-      expiresAt,
-      userId: req.user.id,
-    });
+      if (!["B/W", "Color"].includes(normalizedType)) {
+        console.log('❌ Upload Debug - Invalid type:', normalizedType);
+        return res.status(400).json({ message: "type must be 'B/W' or 'Color'." });
+      }
 
-    console.log(`📄 Document created with token: ${doc.token}`);
+      const parsedCopies = Number(copies);
+      const parsedPages = 1; // Default to 1 page, could be enhanced with PDF page counting
+
+      if (!Number.isFinite(parsedCopies) || parsedCopies < 1) {
+        console.log('❌ Upload Debug - Invalid copies:', parsedCopies);
+        return res.status(400).json({ message: "copies must be a positive number." });
+      }
+
+      // Calculate price for this file
+      const price = calculatePrice(normalizedType, parsedCopies, parsedPages);
+      totalPrice += price;
+      totalCopies += parsedCopies;
+
+      const fileUrl = `/uploads/${file.filename}`;
+
+      // Create document for this file
+      const doc = await Document.create({
+        fileUrl,
+        token: documentToken, // Same token for all files in this batch
+        type: normalizedType,
+        copies: parsedCopies,
+        pages: parsedPages,
+        price: price,
+        status: "waiting",
+        createdAt,
+        expiresAt,
+        userId: req.user.id,
+      });
+
+      createdDocuments.push(doc);
+      console.log(`📄 Document created for file ${i + 1} with token: ${doc.token}`);
+    }
+
+    console.log(`📄 All ${createdDocuments.length} documents created with shared token: ${documentToken}`);
+    
     const response = {
-      token: doc.token,
-      status: doc.status,
-      expiresAt: doc.expiresAt,
-      price: doc.price,
-      type: doc.type,
-      copies: doc.copies,
-      pages: doc.pages
+      token: documentToken,
+      status: "waiting",
+      expiresAt: expiresAt,
+      totalFiles: createdDocuments.length,
+      totalPrice: totalPrice,
+      totalCopies: totalCopies,
+      files: createdDocuments.map(doc => ({
+        filename: doc.fileUrl.split('/').pop(),
+        type: doc.type,
+        copies: doc.copies,
+        pages: doc.pages,
+        price: doc.price
+      }))
     };
-    console.log('📤 Upload response:', response);
-
+    
+    console.log('📤 Multi-file upload response:', response);
     return res.status(201).json(response);
   } catch (err) {
     console.log('❌ Upload Debug - Upload failed:', err.message);
@@ -226,16 +270,19 @@ async function simulatePrint(req, res) {
     const { token } = req.params;
     const adminId = req.user.id;
     const now = new Date();
+    
+    // Case-insensitive token search
+    const searchToken = token ? token.toUpperCase() : token;
 
     // waiting -> printing (atomic)
     const printingDoc = await Document.findOneAndUpdate(
-      { token, status: "waiting", expiresAt: { $gt: now } },
+      { token: { $regex: new RegExp(`^${searchToken}$`, 'i') }, status: "waiting", expiresAt: { $gt: now } },
       { $set: { status: "printing" } },
       { new: true }
     );
 
     if (!printingDoc) {
-      const existing = await Document.findOne({ token });
+      const existing = await Document.findOne({ token: { $regex: new RegExp(`^${searchToken}$`, 'i') } });
       if (!existing) return res.status(404).json({ message: "Token not found." });
 
       await markExpiredIfNeeded(existing);
@@ -260,7 +307,7 @@ async function simulatePrint(req, res) {
 
     // printing -> completed (atomic)
     const completedDoc = await Document.findOneAndUpdate(
-      { token, status: "printing" },
+      { token: { $regex: new RegExp(`^${searchToken}$`, 'i') }, status: "printing" },
       { $set: { status: "completed" } },
       { new: true }
     ).populate('userId', 'name email');
