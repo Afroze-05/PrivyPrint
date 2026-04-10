@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
+import { setAuth } from "../services/authStorage";
 import { motion, AnimatePresence } from "framer-motion";
 console.log(motion, api);
 import {
@@ -81,41 +82,34 @@ export default function VerifyOtp() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, otp: otp }),
-      });
+      const res = await api.post("/auth/verify-otp", { email, otp });
+      console.log("OTP verification response:", res.data);
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (res.data.token && res.data.user) {
         // 1. Trigger the success animation
         setSuccess(true);
 
-        // 2. Get the role from the state we passed from Signup
-        const userRole = location.state?.role;
+        // 2. Store authentication data properly
+        setAuth({ token: res.data.token, user: res.data.user });
+        console.log("Auth data stored successfully");
 
-        // 3. Optional: If your verify-otp returns token/user, set it like your login
-        if (data.token && data.user) {
-          // setAuth({ token: data.token, ...data.user }); // If using AuthContext
-          localStorage.setItem("token", data.token);
-        }
+        // 3. Get the role from the user data
+        const userRole = res.data.user.role;
 
         // 4. Final Conditional Redirect
         setTimeout(() => {
           if (userRole === "admin") {
             navigate("/admin/dashboard");
           } else {
-            navigate("/upload");
+            navigate("/dashboard");
           }
         }, 1500); // 1.5s delay to show the success checkmark
       } else {
-        setError(data.message || "Invalid OTP");
+        setError("Invalid response from server");
       }
     } catch (err) {
-      setError("Server error");
-      console.log(err);
+      setError(err?.response?.data?.message || "Server error");
+      console.log("OTP verification error:", err);
     } finally {
       setLoading(false);
     }

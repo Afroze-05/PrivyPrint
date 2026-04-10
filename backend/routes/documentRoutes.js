@@ -1,7 +1,7 @@
 const express = require("express");
 
 const { authMiddleware, requireRole } = require("../middleware/authMiddleware");
-const { upload } = require("../middleware/uploadMiddleware");
+const { upload, uploadMultiple } = require("../middleware/uploadMiddleware");
 const documentController = require("../controllers/documentController");
 
 const router = express.Router();
@@ -48,7 +48,7 @@ router.post(
     console.log('✅ Upload Route Debug - Role check passed');
     next();
   },
-  upload.single("file"),
+  uploadMultiple.array("files", 10), // Support up to 10 files
   (req, res, next) => {
     console.log('🔍 Upload Route Debug - After multer middleware');
     console.log('🔍 Upload Route Debug - req.file exists:', !!req.file);
@@ -77,7 +77,7 @@ router.post("/test-verify", (req, res) => {
 // Verify token and fetch document details (admin only).
 router.post("/verify-token", authMiddleware, requireRole("admin"), documentController.verifyToken);
 
-router.get("/document/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
+router.get("/documents/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
 
 // Get document by ID (for rating page - accessible by authenticated users)
 router.get("/documents/:id", authMiddleware, documentController.getDocumentById);

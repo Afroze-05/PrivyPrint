@@ -11,6 +11,8 @@ const alertRoutes = require("./routes/alertRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const logsRoutes = require("./routes/logsRoutes");
 const testRoutes = require("./routes/testRoutes");
+const testTokenRoutes = require("./routes/testTokenRoutes");
+// const debugRoutes = require("./routes/debugRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const printRoutes = require("./routes/printRoute");
@@ -64,6 +66,12 @@ app.post("/api/test-route", (req, res) => {
   res.json({ message: "API working" });
 });
 
+app.get("/api/rate-test", (req, res) => {
+  console.log("🔧 rate-test route called");
+  console.log("🔧 rate-test query:", req.query);
+  res.json({ message: "Rate test working", query: req.query });
+});
+
 console.log("🔧 Registering routes...");
 try {
   app.use("/api/auth", authRoutes);
@@ -72,6 +80,8 @@ try {
   app.use("/api", statsRoutes);
   app.use("/api", logsRoutes);
   app.use("/api/test", testRoutes);
+  app.use("/api/debug", testTokenRoutes);
+  // app.use("/api/debug", debugRoutes);
   app.use("/api", adminRoutes);
   app.use("/api/rate", ratingRoutes);
   app.use("/api", printRoutes); // ✅ voice print — single registration here
