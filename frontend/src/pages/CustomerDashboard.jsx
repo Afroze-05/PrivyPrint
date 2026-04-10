@@ -106,6 +106,7 @@ export default function CustomerDashboard() {
                 key={item.id}
                 onClick={() => {
                   if (item.id === "upload") {
+                    setActivePage(item.id);
                     navigate("/upload");
                   } else {
                     setActivePage(item.id);
