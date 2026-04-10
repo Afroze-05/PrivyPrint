@@ -20,7 +20,7 @@ const SecurityAlert = ({ isActive, message, countdown, onGoBack, onRetry }) => {
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "#ffffff", // PURE WHITE background
+        backgroundColor: "black", // PURE WHITE background
         zIndex: 10000,
         display: "flex",
         flexDirection: "column",

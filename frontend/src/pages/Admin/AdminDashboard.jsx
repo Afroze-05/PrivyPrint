@@ -1837,23 +1837,25 @@ export default function AdminDashboard() {
   async function fetchChartData() {
     setChartsLoading(true);
     try {
-      const testToken = "test_admin_token_1775028546379";
-      const [statsRes, documentsRes, tokensRes, activityRes] =
-        await Promise.all([
-          api.get("/stats", {
-            headers: { Authorization: `Bearer ${testToken}` },
-          }),
-          api.get("/documents", {
-            headers: { Authorization: `Bearer ${testToken}` },
-          }),
-          api.get("/tokens", {
-            headers: { Authorization: `Bearer ${testToken}` },
-          }),
-          api.get("/activity", {
-            headers: { Authorization: `Bearer ${testToken}` },
-          }),
-        ]);
+      const [statsRes, documentsRes, tokensRes, activityRes] = await Promise.all([
+        api.get("/stats"),
+        api.get("/documents"),
+        api.get("/tokens"),
+        api.get("/activity"),
+      ]);
 
+      // Use print data from stats API for print activity chart
+      if (statsRes.data && statsRes.data.printsByDay) {
+        const printData = statsRes.data.printsByDay;
+        setChartData(printData.map(item => ({
+          date: item.date,
+          count: item.count
+        })));
+      } else {
+        setChartData([]);
+      }
+
+      // Still use documents data for uploads chart
       if (documentsRes.data && Array.isArray(documentsRes.data)) {
         const documents = documentsRes.data;
         const uploadGroups = {};
@@ -1865,9 +1867,8 @@ export default function AdminDashboard() {
         const uploadChartData = Object.entries(uploadGroups)
           .map(([date, count]) => ({ date, count }))
           .sort((a, b) => new Date(a.date) - new Date(b.date));
-        setChartData(uploadChartData);
-      } else {
-        setChartData([]);
+        // Store upload data separately if needed
+        console.log('Upload chart data:', uploadChartData);
       }
 
       if (tokensRes.data && Array.isArray(tokensRes.data)) {
@@ -3365,6 +3366,7 @@ export default function AdminDashboard() {
                                 "File Name",
                                 "User",
                                 "Type",
+                                "Pages",
                                 "Copies",
                                 "Price",
                                 "Status",
@@ -3372,7 +3374,7 @@ export default function AdminDashboard() {
                               ].map((h) => (
                                 <th
                                   key={h}
-                                  className={`${h === "Copies" ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
+                                  className={`${(h === "Copies" || h === "Pages") ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
                                   style={{ color: "#999999" }}
                                 >
                                   {h}
@@ -3458,6 +3460,14 @@ export default function AdminDashboard() {
                                       {item.printType}
                                     </span>
                                   </div>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <span
+                                    className="text-sm font-medium"
+                                    style={{ color: "#EAEAEA" }}
+                                  >
+                                    {item.pages}
+                                  </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
                                   <span

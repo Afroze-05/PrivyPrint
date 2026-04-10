@@ -9,6 +9,8 @@ const documentSchema = new mongoose.Schema(
     token: { type: String, required: true, unique: true, index: true },
     type: { type: String, enum: DOCUMENT_TYPES, required: true },
     copies: { type: Number, default: 1, min: 1 },
+    pages: { type: Number, default: 1, min: 1 },
+    price: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: DOCUMENT_STATUSES, default: "waiting", index: true },
     expiresAt: { type: Date, required: true, index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },

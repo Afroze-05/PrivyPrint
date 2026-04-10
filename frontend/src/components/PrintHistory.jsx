@@ -34,7 +34,8 @@ const GlassCard = ({ children, className = "", accent = "#FF6B35" }) => (
 const HistoryItem = ({ item, index }) => {
   const getStatusIcon = () => {
     switch (item.status) {
-      case 'completed':
+      case "completed":
+      case "Printed":
         return <CheckCircle className="w-4 h-4" style={{ color: "#22c55e" }} />;
       case 'printing':
         return <Printer className="w-4 h-4" style={{ color: "#FFA05B" }} />;
@@ -49,7 +50,9 @@ const HistoryItem = ({ item, index }) => {
 
   const getStatusText = () => {
     switch (item.status) {
-      case 'completed': return 'Printed';
+      case "completed":
+      case "Printed":
+        return 'Printed';
       case 'printing': return 'Printing';
       case 'waiting': return 'Pending';
       case 'expired': return 'Expired';
@@ -57,9 +60,9 @@ const HistoryItem = ({ item, index }) => {
     }
   };
 
-  const calculatePrice = (type, copies) => {
+  const calculatePrice = (type, copies, pages = 1) => {
     const pricePerPage = PRICING[type] || 0;
-    return pricePerPage * copies;
+    return pricePerPage * copies * pages;
   };
 
   const formatTime = (timestamp) => {
@@ -111,18 +114,18 @@ const HistoryItem = ({ item, index }) => {
             {item.filename || `Document ${item.token?.slice(-6) || 'Unknown'}`}
           </span>
           <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            item.type === "Color" 
+            (item.printType || item.type) === "Color" 
               ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-300"
               : "bg-gradient-to-r from-gray-500/20 to-slate-500/20 border border-gray-500/30 text-gray-300"
           }`}>
-            {item.type === "Color" ? "Color" : "B&W"}
+            {(item.printType || item.type) === "Color" ? "Color" : "B&W"}
           </div>
         </div>
         
         <div className="flex items-center gap-4 text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {formatTime(item.createdAt)}
+            {formatTime(item.timestamp || item.createdAt)}
           </span>
           <span className="flex items-center gap-1">
             {getStatusIcon()}
@@ -143,10 +146,10 @@ const HistoryItem = ({ item, index }) => {
       <div className="flex-shrink-0 text-right">
         <div className="text-lg font-bold" style={{ color: "#22c55e" }}>
           <IndianRupee className="w-4 h-4 inline mr-1" />
-          {calculatePrice(item.type, item.copies)}
+          {item.price || calculatePrice(item.printType || item.type, item.copies, item.pages)}
         </div>
         <div className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-          {item.copies} × {PRICING[item.type] || 0}
+          {item.copies} × {item.pages || 1} × {PRICING[item.printType || item.type] || 0}
         </div>
       </div>
 
@@ -175,19 +178,25 @@ export default function PrintHistory() {
   const todayRevenue = useMemo(() => {
     const today = new Date().toDateString();
     const todayItems = history.filter(item => 
-      new Date(item.createdAt).toDateString() === today
+      new Date(item.timestamp || item.createdAt).toDateString() === today
     );
     
     return todayItems.reduce((total, item) => {
-      const pricePerPage = PRICING[item.type] || 0;
-      return total + (pricePerPage * item.copies);
+      // Use backend price if available, otherwise calculate
+      if (item.price) {
+        return total + item.price;
+      }
+      const pricePerPage = PRICING[item.printType || item.type] || 0;
+      const pages = item.pages || 1;
+      const copies = item.copies || 1;
+      return total + (pricePerPage * copies * pages);
     }, 0);
   }, [history]);
 
   // Fetch history data
   const fetchHistory = async () => {
     try {
-      const response = await api.get("/documents");
+      const response = await api.get("/print-history");
       setHistory(response.data);
       setLastUpdate(new Date());
       setError("");
@@ -209,7 +218,8 @@ export default function PrintHistory() {
           new Date(item.createdAt).toDateString() === today
         );
       case "completed":
-        return history.filter(item => item.status === "completed");
+      case "Printed":
+        return history.filter(item => item.status === 'completed' || item.status === 'Printed');
       case "pending":
         return history.filter(item => item.status === "waiting" || item.status === "printing");
       default:

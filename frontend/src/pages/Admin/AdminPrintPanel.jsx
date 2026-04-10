@@ -351,44 +351,34 @@ export default function AdminPrintPanel() {
     if (!token) { setError("Token is required."); return; }
     const currentAuth = getAuth();
     if (!currentAuth?.token) { navigate("/admin/login"); return; }
+    
     setLoadingDoc(true);
     try {
-      const res = await fetch("http://localhost:5000/api/verify-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader(currentAuth.token)
-        },
-        body: JSON.stringify({ token }),
+      const res = await api.get(`/documents/${token}`, {
+        headers: authHeader(currentAuth.token)
       });
       
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${res.status}`);
-      }
+      const data = res.data;
+      console.log('🔍 AdminPrintPanel - Document fetched from backend:', data);
+      setDoc({
+        token: data.token,
+        fileUrl: data.fileUrl,
+        fileName: data.fileUrl ? data.fileUrl.split('/').pop() : 'document',
+        type: data.type,
+        status: data.status,
+        customerEmail: data.customerEmail,
+        customerName: data.customerName
+      });
       
-      const data = await res.json();
-      console.log('🔍 AdminPrintPanel - Token verified:', data);
-      setDoc(data);
-      
-      // Set file type and determine if grayscale should be applied
-      const detectedType = data.type || "B/W";
-      setFileType(detectedType);
-      setIsGrayscale(detectedType === "B/W");
-      
-      // Set the original image URL for preview (use fileUrl field)
-      if (data.fileUrl || data.file) {
-        const fileUrl = data.fileUrl || data.file;
-        setOriginalImageUrl(`${apiBaseUrl}${fileUrl}`);
-        console.log('🖼️ Set image URL:', `${apiBaseUrl}${fileUrl}`);
-      }
-      
+      setFileType(data.type || "B/W");
+      setIsGrayscale((data.type || "B/W") === "B/W");
+      setOriginalImageUrl(`${apiBaseUrl}${data.fileUrl}`);
       setWatermarkTime(new Date());
       setSecondsLeft(120);
       setIntervalActive(true);
     } catch (err) {
-      console.error('❌ AdminPrintPanel - Token verification error:', err);
-      setError(err?.response?.data?.message || err.message || "Failed to verify token.");
+      console.error('❌ AdminPrintPanel - Document fetch error:', err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch document.");
       setDoc(null); 
       setIntervalActive(false);
       setPrintStatus('error');
@@ -409,6 +399,7 @@ export default function AdminPrintPanel() {
     
     try {
       await api.post(`/print/${encodeURIComponent(doc.token)}`, null, { headers: authHeader(currentAuth.token) });
+      
       const today = new Date().toISOString().split("T")[0];
       const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
       const dayStats = allStats[today] || { bw: 0, color: 0, total: 0 };
@@ -641,7 +632,7 @@ export default function AdminPrintPanel() {
                     icon={Key}
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="SPX-1234"
+                    placeholder="SPX-XXXXX"
                     disabled={isPrinting}
                     accent="#FF6B35"
                   />

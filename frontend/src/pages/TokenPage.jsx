@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion);
 import {
   CheckCircle,
   Cpu,
@@ -14,7 +13,6 @@ import {
   Check,
   Mic,
 } from "lucide-react";
-import { getCustomerToken } from "../services/customerTokenStorage";
 
 /* ── Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -95,16 +93,79 @@ const QRMosaic = ({ seed = 42 }) => {
 };
 
 /* ── Countdown timer ── */
-const Countdown = () => {
-  const [secs, setSecs] = useState(600);
+const Countdown = ({ navigate, onExpired }) => {
+  const [secs, setSecs] = useState(() => {
+    // Get stored timer start time or initialize new
+    const storedStartTime = localStorage.getItem('tokenTimerStart');
+    const storedDuration = localStorage.getItem('tokenDuration');
+    
+    if (storedStartTime && storedDuration) {
+      const elapsed = Math.floor((Date.now() - parseInt(storedStartTime)) / 1000);
+      const remaining = parseInt(storedDuration) - elapsed;
+      return Math.max(0, remaining);
+    }
+    
+    // Store initial timer state
+    localStorage.setItem('tokenTimerStart', Date.now().toString());
+    localStorage.setItem('tokenDuration', '120');
+    return 120;
+  });
+
+  const [expired, setExpired] = useState(false);
+
   useEffect(() => {
-    const id = setInterval(() => setSecs((s) => Math.max(0, s - 1)), 1000);
+    const id = setInterval(() => {
+      setSecs((s) => {
+        const newSecs = Math.max(0, s - 1);
+        
+        // Update localStorage
+        const elapsed = 120 - newSecs;
+        localStorage.setItem('tokenTimerStart', (Date.now() - (elapsed * 1000)).toString());
+        localStorage.setItem('tokenDuration', '120');
+        
+        if (newSecs === 0) {
+          setExpired(true);
+          // Clear customer token when expired
+          localStorage.removeItem('customerToken');
+          localStorage.removeItem('tokenTimerStart');
+          localStorage.removeItem('tokenDuration');
+          onExpired();
+        }
+        
+        return newSecs;
+      });
+    }, 1000);
+    
     return () => clearInterval(id);
-  }, []);
+  }, [onExpired]);
+
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
-  const pct = (secs / 600) * 100;
-  const accent = secs > 180 ? "#FF6B35" : "#ef4444";
+  const pct = secs > 0 ? (secs / 120) * 100 : 0;
+  const accent = secs > 20 ? "#FF6B35" : "#ef4444";
+
+  if (expired) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-6 border border-red-500/30 bg-red-500/10 rounded-lg">
+        <AlertTriangle className="w-8 h-8 text-red-400" />
+        <div className="text-center">
+          <span className="text-sm font-black text-red-400 uppercase tracking-widest">
+            Token Expired
+          </span>
+          <p className="text-xs text-gray-400 mt-2">
+            Please upload the document again.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/upload")}
+          className="px-4 py-2 bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-lg hover:bg-red-600 transition-colors"
+        >
+          Upload Again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -139,10 +200,38 @@ const Countdown = () => {
 
 export default function TokenPage() {
   const navigate = useNavigate();
-  const customerToken = getCustomerToken();
-  const token = customerToken?.token || "SPX-0000";
+  const customerToken = JSON.parse(localStorage.getItem("customerToken"));
+  const token = customerToken?.token || "";
   const type = localStorage.getItem("printType") || "B/W";
   const [copied, setCopied] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  console.log("Token received:", customerToken);
+
+  // Check if token exists, if not redirect to upload
+  useEffect(() => {
+    if (!customerToken || !customerToken.token) {
+      console.log("No token found, redirecting to upload...");
+      navigate("/upload");
+    }
+  }, [customerToken, navigate]);
+
+  // Check if token is already expired on mount
+  useEffect(() => {
+    const storedStartTime = localStorage.getItem('tokenTimerStart');
+    const storedDuration = localStorage.getItem('tokenDuration');
+    
+    if (storedStartTime && storedDuration) {
+      const elapsed = Math.floor((Date.now() - parseInt(storedStartTime)) / 1000);
+      const remaining = parseInt(storedDuration) - elapsed;
+      if (remaining <= 0) {
+        setExpired(true);
+        localStorage.removeItem('customerToken');
+        localStorage.removeItem('tokenTimerStart');
+        localStorage.removeItem('tokenDuration');
+      }
+    }
+  }, []);
 
   const handleCopyToken = async () => {
     try {
@@ -204,12 +293,16 @@ export default function TokenPage() {
       >
         {/* Success Indicator */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 flex items-center justify-center border border-green-400/30 bg-green-400/10 mb-5">
-            <CheckCircle className="w-7 h-7 text-green-400" />
+          <div className={`w-16 h-16 flex items-center justify-center border ${expired ? 'border-red-400/30 bg-red-400/10' : 'border-green-400/30 bg-green-400/10'} mb-5`}>
+            {expired ? (
+              <AlertTriangle className="w-7 h-7 text-red-400" />
+            ) : (
+              <CheckCircle className="w-7 h-7 text-green-400" />
+            )}
           </div>
-          <div className="px-5 py-2 border border-green-400/20 bg-green-400/5">
-            <span className="text-[9px] font-black tracking-[0.55em] text-green-400/80 uppercase">
-              File Uploaded Securely
+          <div className={`px-5 py-2 border ${expired ? 'border-red-400/20 bg-red-400/5' : 'border-green-400/20 bg-green-400/5'}`}>
+            <span className={`text-[9px] font-black tracking-[0.55em] uppercase ${expired ? 'text-red-400/80' : 'text-green-400/80'}`}>
+              {expired ? "Session Expired" : "File Uploaded Securely"}
             </span>
           </div>
         </div>
@@ -220,82 +313,90 @@ export default function TokenPage() {
 
         <div className="relative backdrop-blur-xl border rounded-2xl p-6 bg-white/5 border-white/10 shadow-2xl">
           <div className="relative z-10 flex flex-col gap-6">
-            {/* Token Display Area */}
-            <div className="relative p-5 border border-[#FF6B35]/15 bg-[#050505] rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-[#FF6B35]/60" />
-                  <span className="text-[9px] font-black tracking-[0.5em] text-[#FF6B35]/50 uppercase">
-                    Secure Access Token
-                  </span>
+            {/* Token Display Area - Hidden when expired */}
+            {!expired && (
+              <div className="relative p-5 border border-[#FF6B35]/15 bg-[#050505] rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-[#FF6B35]/60" />
+                    <span className="text-[9px] font-black tracking-[0.5em] text-[#FF6B35]/50 uppercase">
+                      Secure Access Token
+                    </span>
+                  </div>
+                  <button onClick={handleCopyToken} className="text-[#FF6B35]">
+                    {copied ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
-                <button onClick={handleCopyToken} className="text-[#FF6B35]">
-                  {copied ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
 
-              <div className="text-5xl font-black tracking-[0.2em] text-white text-center py-3">
-                {token}
-              </div>
+                <div className="text-5xl font-black tracking-[0.2em] text-white text-center py-3">
+                  {token}
+                </div>
 
-              <div className="flex justify-center gap-3 mt-3">
-                <div className="px-3 py-1 border border-white/10 bg-white/4 text-[9px] font-black text-white/40 uppercase">
-                  Mode: {type}
+                <div className="flex justify-center gap-3 mt-3">
+                  <div className="px-3 py-1 border border-white/10 bg-white/4 text-[9px] font-black text-white/40 uppercase">
+                    Mode: {type}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* QR + Kiosk Label */}
-            <div className="flex flex-col items-center gap-2">
-              <QRMosaic seed={token.charCodeAt(0)} token={token} />
-              <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
-                Scan at Kiosk
-              </span>
-            </div>
-
-            <Countdown />
-
-            {/* Voice Print Shortcut */}
-            <motion.button
-              whileHover={{
-                scale: 1.02,
-                backgroundColor: "rgba(255, 107, 53, 0.1)",
-              }}
-              onClick={() => navigate("/voice-print")}
-              className="w-full p-4 rounded-xl border-2 border-dashed border-[#FF6B35]/30 bg-[#FF6B35]/5 flex flex-col items-center gap-1"
-            >
-              <div className="flex items-center gap-2 text-[#FF6B35]">
-                <Mic className="w-4 h-4 animate-pulse" />
-                <span className="font-bold text-xs uppercase tracking-widest">
-                  Try Voice Print
+            {/* QR + Kiosk Label - Hidden when expired */}
+            {!expired && (
+              <div className="flex flex-col items-center gap-2">
+                <QRMosaic seed={token.charCodeAt(0)} token={token} />
+                <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
+                  Scan at Kiosk
                 </span>
               </div>
-              <p className="text-[10px] text-gray-500 italic">
-                Say: "Print token {token}"
-              </p>
-            </motion.button>
+            )}
 
-            {/* Final Actions */}
-            <div className="flex flex-col gap-3">
+            <Countdown navigate={navigate} onExpired={() => setExpired(true)} />
+
+            {/* Voice Print Shortcut - Hidden when expired */}
+            {!expired && (
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                onClick={() => window.print()}
-                className="w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm bg-linear-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-2 rounded-lg"
+                whileHover={{
+                  scale: 1.02,
+                  backgroundColor: "rgba(255, 107, 53, 0.1)",
+                }}
+                onClick={() => navigate("/voice-print")}
+                className="w-full p-4 rounded-xl border-2 border-dashed border-[#FF6B35]/30 bg-[#FF6B35]/5 flex flex-col items-center gap-1"
               >
-                <Download className="w-4 h-4" /> Download Slip
+                <div className="flex items-center gap-2 text-[#FF6B35]">
+                  <Mic className="w-4 h-4 animate-pulse" />
+                  <span className="font-bold text-xs uppercase tracking-widest">
+                    Try Voice Print
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500 italic">
+                  Say: "Print token {token}"
+                </p>
               </motion.button>
+            )}
 
-              <button
-                onClick={() => navigate("/")}
-                className="w-full py-3.5 border border-white/10 text-white/30 hover:text-[#FF6B35] transition-all text-[10px] font-black uppercase tracking-[0.35em]"
-              >
-                Done
-              </button>
-            </div>
+            {/* Final Actions - Hidden when expired */}
+            {!expired && (
+              <div className="flex flex-col gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => window.print()}
+                  className="w-full py-4 font-black uppercase tracking-[0.4em] text-white text-sm bg-gradient-to-r from-[#FF6B35] to-[#FF8A50] flex items-center justify-center gap-2 rounded-lg"
+                >
+                  <Download className="w-4 h-4" /> Download Slip
+                </motion.button>
+
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-full py-3.5 border border-white/10 text-white/30 hover:text-[#FF6B35] transition-all text-[10px] font-black uppercase tracking-[0.35em]"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

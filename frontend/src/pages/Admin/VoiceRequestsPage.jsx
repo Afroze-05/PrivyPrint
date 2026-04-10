@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Mic, Clock, CheckCircle, XCircle, Loader2, User, Mail } from "lucide-react";
 import { getAuth } from "../../services/authStorage";
-console.log("VoiceRequestsPage loaded", motion);
+import { api } from "../../services/api";
+
 export default function VoiceRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,13 +11,10 @@ export default function VoiceRequestsPage() {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/voice-requests", {
-        headers: { Authorization: `Bearer ${auth?.token}` },
-      });
-      const data = await res.json();
-      setRequests(data);
-    } catch {
-      console.error("Failed to load voice requests");
+      const res = await api.get("/voice-requests");
+      setRequests(res.data);
+    } catch (err) {
+      console.error("Failed to load voice requests:", err);
     } finally {
       setLoading(false);
     }
@@ -28,17 +26,10 @@ export default function VoiceRequestsPage() {
 
   const updateStatus = async (id, status) => {
     try {
-      await fetch(`http://localhost:5000/api/voice-requests/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth?.token}`,
-        },
-        body: JSON.stringify({ status }),
-      });
+      await api.patch(`/voice-requests/${id}`, { status });
       fetchRequests(); // refresh
-    } catch {
-      console.error("Failed to update status");
+    } catch (err) {
+      console.error("Failed to update status:", err);
     }
   };
 
@@ -47,6 +38,11 @@ export default function VoiceRequestsPage() {
       bg: "rgba(255,107,53,0.1)",
       border: "rgba(255,107,53,0.3)",
       text: "#FF6B35",
+    },
+    verified: {
+      bg: "rgba(34,197,94,0.1)",
+      border: "rgba(34,197,94,0.3)",
+      text: "#22c55e",
     },
     printed: {
       bg: "rgba(34,197,94,0.1)",
@@ -98,7 +94,25 @@ export default function VoiceRequestsPage() {
                   }}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-3 flex-1">
+                      {/* User Information */}
+                      {req.user && (
+                        <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-white/40" />
+                            <span className="text-sm font-medium text-white">
+                              {req.user.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-white/40" />
+                            <span className="text-sm text-white/60">
+                              {req.user.email}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Token */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-white/30 uppercase tracking-widest">
@@ -111,13 +125,28 @@ export default function VoiceRequestsPage() {
 
                       {/* Transcript */}
                       {req.transcript && (
-                        <p className="text-sm text-white/50 italic mt-1">
+                        <div className="text-sm text-white/50 italic">
+                          <span className="text-xs text-white/30 uppercase tracking-widest block mb-1">
+                            Transcript
+                          </span>
                           "{req.transcript}"
-                        </p>
+                        </div>
+                      )}
+
+                      {/* Type */}
+                      {req.type && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-white/30 uppercase tracking-widest">
+                            Type
+                          </span>
+                          <span className="text-xs font-medium text-white/60 px-2 py-1 rounded bg-white/5">
+                            {req.type.replace('_', ' ')}
+                          </span>
+                        </div>
                       )}
 
                       {/* Time */}
-                      <div className="flex items-center gap-1 mt-2">
+                      <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-white/20" />
                         <span className="text-xs text-white/20">
                           {new Date(req.requestedAt).toLocaleString()}
@@ -141,10 +170,10 @@ export default function VoiceRequestsPage() {
                       {req.status === "pending" && (
                         <div className="flex gap-2 mt-1">
                           <button
-                            onClick={() => updateStatus(req._id, "printed")}
+                            onClick={() => updateStatus(req._id, "verified")}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-green-400 border border-green-400/30 hover:bg-green-400/10 transition-colors"
                           >
-                            <CheckCircle className="w-3 h-3" /> Mark Printed
+                            <CheckCircle className="w-3 h-3" /> Verify
                           </button>
                           <button
                             onClick={() => updateStatus(req._id, "rejected")}
