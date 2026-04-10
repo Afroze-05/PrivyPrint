@@ -1132,7 +1132,7 @@ export default function CustomerSignup() {
       const loginRes = await api.post("/auth/login", { email, password });
       const { token, user } = loginRes.data;
       setAuth({ token, ...user });
-      navigate("/upload");
+      navigate("/dashboard");
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {

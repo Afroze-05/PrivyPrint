@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dashboard Access</title>
+</head>
+<body>
+    <h1>Setting up test authentication...</h1>
+    <script>
+        // Set test authentication data
+        const testAuth = {
+            token: 'test_token_' + Date.now(),
+            user: {
+                id: 1,
+                name: 'Test User',
+                email: 'test@example.com',
+                role: 'customer'
+            }
+        };
+        
+        localStorage.setItem('secureprint_auth', JSON.stringify(testAuth));
+        localStorage.setItem('privyprint_test_token', 'true');
+        
+        console.log('Test auth set:', testAuth);
+        
+        // Redirect to dashboard
+        setTimeout(() => {
+            window.location.href = '/dashboard';
+        }, 1000);
+    </script>
+    <p>Redirecting to dashboard in 1 second...</p>
+</body>
+</html>

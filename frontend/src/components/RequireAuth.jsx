@@ -19,10 +19,12 @@ export default function RequireAuth({ roles = [], children }) {
     return <Navigate to={redirectTo} replace />;
   }
 
+  // TEMPORARILY BYPASS ROLE CHECK FOR TESTING
   if (roles.length > 0 && !roles.includes(auth?.user?.role) && !hasTestToken) {
     console.log("RequireAuth - Role mismatch, redirecting...");
     console.log("RequireAuth - Required roles:", roles);
     console.log("RequireAuth - User role:", auth?.user?.role);
+    console.log("RequireAuth - User data:", auth?.user);
     
     // If user is admin but trying to access customer routes, redirect to admin login
     // If user is customer but trying to access admin routes, redirect to customer login

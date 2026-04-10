@@ -1,10 +1,13 @@
 const express = require("express");
 
 const { authMiddleware, requireRole } = require("../middleware/authMiddleware");
-const { upload } = require("../middleware/uploadMiddleware");
+const { upload, uploadMultiple } = require("../middleware/uploadMiddleware");
 const documentController = require("../controllers/documentController");
 
 const router = express.Router();
+
+// Test route for fixed APIs (temporary - remove after testing)
+router.get("/test-fixed-apis", documentController.getRealTimeStats);
 
 // Upload document (admin and customer).
 router.post(
@@ -45,7 +48,7 @@ router.post(
     console.log('✅ Upload Route Debug - Role check passed');
     next();
   },
-  upload.single("file"),
+  uploadMultiple.array("files", 10), // Support up to 10 files
   (req, res, next) => {
     console.log('🔍 Upload Route Debug - After multer middleware');
     console.log('🔍 Upload Route Debug - req.file exists:', !!req.file);
@@ -74,7 +77,10 @@ router.post("/test-verify", (req, res) => {
 // Verify token and fetch document details (admin only).
 router.post("/verify-token", authMiddleware, requireRole("admin"), documentController.verifyToken);
 
-router.get("/document/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
+router.get("/documents/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
+
+// Get document by ID (for rating page - accessible by authenticated users)
+router.get("/documents/:id", authMiddleware, documentController.getDocumentById);
 
 // Simulate printing flow waiting -> printing -> completed (admin only).
 router.post("/print/:token", authMiddleware, requireRole("admin"), documentController.simulatePrint);
@@ -84,6 +90,12 @@ router.get("/print-history", authMiddleware, requireRole("admin"), documentContr
 
 // Get daily revenue statistics (admin only).
 router.get("/daily-revenue", authMiddleware, requireRole("admin"), documentController.getDailyRevenue);
+
+// Get real-time print statistics (admin only).
+router.get("/realtime-stats", authMiddleware, requireRole("admin"), documentController.getRealTimeStats);
+
+// Get earnings history (admin only).
+router.get("/earnings-history", authMiddleware, requireRole("admin"), documentController.getEarningsHistory);
 
 console.log("🔧 documentRoutes module loaded");
 
