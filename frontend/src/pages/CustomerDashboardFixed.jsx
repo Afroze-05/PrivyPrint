@@ -24,6 +24,7 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [files, setFiles] = useState([]);
   const auth = getAuth();
 
   // Mock data
@@ -181,6 +182,26 @@ export default function CustomerDashboard() {
     </div>
   );
 
+  const handleFileChange = (e) => {
+    setFiles(Array.from(e.target.files));
+  };
+
+  const handleGenerateToken = () => {
+    if (files.length === 0) {
+      alert("Please upload at least one file");
+      return;
+    }
+
+    const token = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+    localStorage.setItem("customerToken", JSON.stringify({
+      token: token,
+      status: "waiting"
+    }));
+
+    navigate("/token");
+  };
+
   const renderUpload = () => (
     <div className="space-y-6">
       <motion.div
@@ -200,43 +221,32 @@ export default function CustomerDashboard() {
           </p>
           <input
             type="file"
+            multiple
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+            onChange={handleFileChange}
             className="mt-4"
           />
         </div>
 
-        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium mb-3">Print Options</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="flex items-center space-x-2">
-                <input type="checkbox" className="rounded text-orange-500" />
-                <span className="text-sm">Color Print</span>
-              </label>
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Number of Copies</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                defaultValue="1"
-                className="w-full px-3 py-1 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Page Selection</label>
-              <select className="w-full px-3 py-1 border border-gray-300 rounded-lg">
-                <option value="all">All Pages</option>
-                <option value="first">First Page Only</option>
-                <option value="last">Last Page Only</option>
-              </select>
+        {files.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">Selected Files ({files.length}):</h4>
+            <div className="space-y-2">
+              {files.map((file, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <span className="text-sm">{file.name}</span>
+                  <span className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
-        <button className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium mt-4">
-          Submit Print Job
+        <button 
+          onClick={handleGenerateToken}
+          className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium mt-4"
+        >
+          Generate Token
         </button>
       </motion.div>
     </div>

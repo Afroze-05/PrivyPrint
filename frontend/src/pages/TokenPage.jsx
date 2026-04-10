@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-console.log(motion);
 import {
   CheckCircle,
   Cpu,
@@ -14,7 +13,6 @@ import {
   Check,
   Mic,
 } from "lucide-react";
-import { getCustomerToken } from "../services/customerTokenStorage";
 
 /* ── Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -109,8 +107,8 @@ const Countdown = ({ navigate, onExpired }) => {
     
     // Store initial timer state
     localStorage.setItem('tokenTimerStart', Date.now().toString());
-    localStorage.setItem('tokenDuration', '60');
-    return 60;
+    localStorage.setItem('tokenDuration', '120');
+    return 120;
   });
 
   const [expired, setExpired] = useState(false);
@@ -121,9 +119,9 @@ const Countdown = ({ navigate, onExpired }) => {
         const newSecs = Math.max(0, s - 1);
         
         // Update localStorage
-        const elapsed = 60 - newSecs;
+        const elapsed = 120 - newSecs;
         localStorage.setItem('tokenTimerStart', (Date.now() - (elapsed * 1000)).toString());
-        localStorage.setItem('tokenDuration', '60');
+        localStorage.setItem('tokenDuration', '120');
         
         if (newSecs === 0) {
           setExpired(true);
@@ -143,7 +141,7 @@ const Countdown = ({ navigate, onExpired }) => {
 
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
-  const pct = secs > 0 ? (secs / 60) * 100 : 0;
+  const pct = secs > 0 ? (secs / 120) * 100 : 0;
   const accent = secs > 20 ? "#FF6B35" : "#ef4444";
 
   if (expired) {
@@ -202,24 +200,19 @@ const Countdown = ({ navigate, onExpired }) => {
 
 export default function TokenPage() {
   const navigate = useNavigate();
-  const customerToken = getCustomerToken();
-  const token = customerToken?.token || "A9X2B";
+  const customerToken = JSON.parse(localStorage.getItem("customerToken"));
+  const token = customerToken?.token || "";
   const type = localStorage.getItem("printType") || "B/W";
   const [copied, setCopied] = useState(false);
   const [expired, setExpired] = useState(false);
 
+  console.log("Token received:", customerToken);
+
   // Check if token exists, if not redirect to upload
   useEffect(() => {
-    if (!customerToken?.token) {
+    if (!customerToken || !customerToken.token) {
+      console.log("No token found, redirecting to upload...");
       navigate("/upload");
-      return;
-    }
-    
-    // Additional check: ensure token was generated from a successful upload
-    const uploadStatus = customerToken?.status;
-    if (!uploadStatus || (uploadStatus !== "waiting" && uploadStatus !== "processing" && uploadStatus !== "completed")) {
-      navigate("/upload");
-      return;
     }
   }, [customerToken, navigate]);
 

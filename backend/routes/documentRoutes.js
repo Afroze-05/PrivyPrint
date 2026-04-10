@@ -77,7 +77,7 @@ router.post("/test-verify", (req, res) => {
 // Verify token and fetch document details (admin only).
 router.post("/verify-token", authMiddleware, requireRole("admin"), documentController.verifyToken);
 
-router.get("/document/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
+router.get("/documents/:token", authMiddleware, requireRole("admin"), documentController.getDocumentByToken);
 
 // Get document by ID (for rating page - accessible by authenticated users)
 router.get("/documents/:id", authMiddleware, documentController.getDocumentById);

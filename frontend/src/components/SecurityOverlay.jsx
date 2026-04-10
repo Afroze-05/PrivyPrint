@@ -139,13 +139,13 @@ const SecurityOverlay = () => {
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "#ffffff", // PURE WHITE background
+        backgroundColor: "#1a0000ff", // PURE WHITE background
         zIndex: 10000,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "#dc2626", // RED ONLY text
+        color: "#f54646ff", // RED ONLY text
         textAlign: "center",
         padding: "20px",
         userSelect: "none",

@@ -11,6 +11,8 @@ const alertRoutes = require("./routes/alertRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const logsRoutes = require("./routes/logsRoutes");
 const testRoutes = require("./routes/testRoutes");
+const testTokenRoutes = require("./routes/testTokenRoutes");
+// const debugRoutes = require("./routes/debugRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const printRoutes = require("./routes/printRoute");
@@ -72,6 +74,8 @@ try {
   app.use("/api", statsRoutes);
   app.use("/api", logsRoutes);
   app.use("/api/test", testRoutes);
+  app.use("/api/debug", testTokenRoutes);
+  // app.use("/api/debug", debugRoutes);
   app.use("/api", adminRoutes);
   app.use("/api/rate", ratingRoutes);
   app.use("/api", printRoutes); // ✅ voice print — single registration here
