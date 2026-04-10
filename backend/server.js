@@ -66,6 +66,12 @@ app.post("/api/test-route", (req, res) => {
   res.json({ message: "API working" });
 });
 
+app.get("/api/rate-test", (req, res) => {
+  console.log("🔧 rate-test route called");
+  console.log("🔧 rate-test query:", req.query);
+  res.json({ message: "Rate test working", query: req.query });
+});
+
 console.log("🔧 Registering routes...");
 try {
   app.use("/api/auth", authRoutes);

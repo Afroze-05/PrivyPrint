@@ -277,7 +277,8 @@ async function sendPrintSuccessEmail(document) {
       filename: filename,
       type: document.type,
       copies: document.copies || 1,
-      token: document.token
+      token: document.token,
+      jobId: document._id
     };
     
     // Send completion email with rating request

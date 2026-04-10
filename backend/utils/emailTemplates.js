@@ -1,5 +1,6 @@
 const getRatingEmailTemplate = (userName, jobDetails, ratingUrl) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
   
   return `
     <!DOCTYPE html>
@@ -182,18 +183,18 @@ const getRatingEmailTemplate = (userName, jobDetails, ratingUrl) => {
             <p>Your feedback helps us improve our service for everyone.</p>
             
             <div class="quick-rating">
-              <a href="${ratingUrl}&rating=5">😊 Excellent</a>
-              <a href="${ratingUrl}&rating=4">🙂 Good</a>
-              <a href="${ratingUrl}&rating=3">😐 Average</a>
-              <a href="${ratingUrl}&rating=2">😕 Fair</a>
-              <a href="${ratingUrl}&rating=1">😞 Poor</a>
+              <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}&rating=5">😊 Excellent</a>
+              <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}&rating=4">🙂 Good</a>
+              <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}&rating=3">😐 Average</a>
+              <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}&rating=2">😕 Fair</a>
+              <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}&rating=1">😞 Poor</a>
             </div>
             
             <p style="margin: 20px 0; color: #666666; font-size: 14px;">
               Or click the button below for detailed rating:
             </p>
             
-            <a href="${ratingUrl}" class="cta-button">
+            <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}" class="cta-button">
               ⭐ Rate Your Experience
             </a>
           </div>

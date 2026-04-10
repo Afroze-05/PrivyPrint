@@ -22,7 +22,8 @@ async function submitRating(req, res) {
     }
 
     // Verify the document exists and is completed
-    const document = await Document.findById(jobId);
+    const mongoose = require('mongoose');
+    const document = await Document.findById(mongoose.Types.ObjectId.isValid(jobId) ? jobId : null).populate('userId');
     if (!document) {
       return res.status(404).json({ 
         message: "Print job not found" 
@@ -218,7 +219,32 @@ async function updateUserTrustScore(userId) {
 // Handle rating from email link (GET request)
 async function handleEmailRating(req, res) {
   try {
-    const { jobId, rating } = req.query;
+    console.log('🔍 Email Rating Debug - Full URL:', req.originalUrl);
+    console.log('🔍 Email Rating Debug - URL parsed:', req.url);
+    console.log('🔍 Email Rating Debug - Query string:', req.querystring);
+    console.log('🔍 Email Rating Debug - Query params:', req.query);
+    console.log('🔍 Email Rating Debug - All params:', req.params);
+    console.log('🔍 Email Rating Debug - Raw headers:', req.headers);
+    
+    // Parse query parameters manually if needed
+    let jobId, rating;
+    
+    // Try multiple parsing methods
+    if (req.query.jobId) {
+      jobId = req.query.jobId;
+    } else if (req.url) {
+      // Manual URL parsing
+      const urlParts = req.url.split('?');
+      if (urlParts.length > 1) {
+        const queryString = urlParts[1];
+        const params = new URLSearchParams(queryString);
+        jobId = params.get('jobId');
+        rating = params.get('rating');
+      }
+    }
+    
+    console.log('🔍 Email Rating Debug - Parsed jobId:', jobId);
+    console.log('🔍 Email Rating Debug - Parsed rating:', rating);
 
     if (!jobId || !rating) {
       return res.status(400).json({ 
@@ -233,7 +259,13 @@ async function handleEmailRating(req, res) {
       });
     }
 
-    // For email links, we need to identify the user by finding the document
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({ 
+        message: "Invalid job ID format" 
+      });
+    }
+    
     const document = await Document.findById(jobId).populate('userId');
     if (!document) {
       return res.status(404).json({ 
