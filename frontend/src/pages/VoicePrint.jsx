@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mic, MicOff, ArrowLeft, Loader2 } from "lucide-react";
-import { api } from "../services/api";
 
 const VoicePrint = () => {
   const navigate = useNavigate();
@@ -11,7 +10,7 @@ const VoicePrint = () => {
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
   const recognitionRef = useRef(null);
-  console.log(motion);
+
   // Matches both numeric "4582" AND alphanumeric "copama3"
   // Looks for the word token/number/id followed by the actual token value
   const parseToken = (text) => {
@@ -44,23 +43,24 @@ const VoicePrint = () => {
     setMessage(`Sending request for token "${token}"…`);
 
     try {
-      const res = await api.post("/print", { 
-        token, 
-        transcript: text 
+      const res = await fetch("http://localhost:5000/api/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, transcript: text }), // send full transcript too
       });
 
-      const data = res.data;
+      const data = await res.json();
 
-      if (res.status === 200) {
+      if (res.ok) {
         setStatus("success");
         setMessage(data.message || `Request sent for token "${token}"!`);
       } else {
         setStatus("error");
         setMessage(data.error || "Request failed.");
       }
-    } catch (err) {
+    } catch {
       setStatus("error");
-      setMessage(err.response?.data?.error || "Could not reach print server. Is the backend running?");
+      setMessage("Could not reach print server. Is the backend running?");
     }
   }, []);
 
@@ -69,6 +69,8 @@ const VoicePrint = () => {
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
+      setStatus("error");
+      setMessage("Web Speech API not supported. Please use Chrome or Edge.");
       return;
     }
 
@@ -79,7 +81,7 @@ const VoicePrint = () => {
 
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript;
-      setTranscript(text); //  shows on screen immediately
+      setTranscript(text); // ✅ shows on screen immediately
       handleVoiceCommand(text);
     };
 
@@ -104,18 +106,6 @@ const VoicePrint = () => {
       recognition.abort();
     };
   }, [handleVoiceCommand]);
-
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setTimeout(() => {
-        setStatus("error");
-        setMessage("Web Speech API not supported. Please use Chrome or Edge.");
-      }, 0);
-    }
-  }, []);
 
   const startListening = () => {
     if (!recognitionRef.current) {
@@ -225,7 +215,7 @@ const VoicePrint = () => {
 
         {/* Transcript box — always visible, fills in after stop */}
         <div
-          className="w-full rounded-xl border p-4 min-h-20 flex items-center justify-center"
+          className="w-full rounded-xl border p-4 min-h-[80px] flex items-center justify-center"
           style={{
             background: "rgba(255,255,255,0.03)",
             border: "1px solid rgba(255,255,255,0.08)",
