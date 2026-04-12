@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, ShieldCheck, AlertTriangle, LayoutDashboard, Printer,
-  FileText, Clock, Cpu, ChevronRight, CheckCircle, XCircle, Eye, Key, Search, Filter } from "lucide-react";
+  FileText, Clock, Cpu, ChevronRight, CheckCircle, XCircle, Eye, Key, Search, Filter, ZoomIn, ZoomOut, RotateCw, Download } from "lucide-react";
 import { api, apiBaseUrl, authHeader } from "../../services/api";
 import { getAuth, setAuth } from "../../services/authStorage";
 import CameraPermissionModal from "../../components/CameraPermissionModal";
 import SecurityOverlay from "../../components/SecurityOverlay";
 import PhoneDetection from "../../components/security/PhoneDetection";
+import PrintHistory from "../../components/PrintHistory";
 import { motion, AnimatePresence } from "framer-motion";
-
-function formatWatermarkTime(d) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
 
 /* ── Premium Noise grain overlay ── */
 const NoiseSVG = () => (
@@ -265,6 +262,15 @@ export default function AdminPrintPanel() {
   const [doc, setDoc] = useState(null);
   const [watermarkTime, setWatermarkTime] = useState(null);
 
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [isGrayscale, setIsGrayscale] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [showZoomControls, setShowZoomControls] = useState(false);
+  const [fileType, setFileType] = useState(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState(null);
+
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [error, setError] = useState("");
 
@@ -326,6 +332,18 @@ export default function AdminPrintPanel() {
     window.setTimeout(() => setPopup(null), 3000);
   }
 
+  function formatWatermarkTime(date) {
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  }
+
   async function handleFetchDocument() {
     setError(""); setPrintStatus(null); setShowStatusCard(false); setDoc(null);
     const token = tokenInput.trim();
@@ -333,31 +351,34 @@ export default function AdminPrintPanel() {
     if (!token) { setError("Token is required."); return; }
     const currentAuth = getAuth();
     if (!currentAuth?.token) { navigate("/admin/login"); return; }
+    
     setLoadingDoc(true);
     try {
-      const res = await fetch("http://localhost:5000/api/verify-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader(currentAuth.token)
-        },
-        body: JSON.stringify({ token }),
+      const res = await api.get(`/documents/${token}`, {
+        headers: authHeader(currentAuth.token)
       });
       
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${res.status}`);
-      }
+      const data = res.data;
+      console.log('🔍 AdminPrintPanel - Document fetched from backend:', data);
+      setDoc({
+        token: data.token,
+        fileUrl: data.fileUrl,
+        fileName: data.fileUrl ? data.fileUrl.split('/').pop() : 'document',
+        type: data.type,
+        status: data.status,
+        customerEmail: data.customerEmail,
+        customerName: data.customerName
+      });
       
-      const data = await res.json();
-      console.log('🔍 AdminPrintPanel - Token verified:', data);
-      setDoc(data);
+      setFileType(data.type || "B/W");
+      setIsGrayscale((data.type || "B/W") === "B/W");
+      setOriginalImageUrl(`${apiBaseUrl}${data.fileUrl}`);
       setWatermarkTime(new Date());
       setSecondsLeft(120);
       setIntervalActive(true);
     } catch (err) {
-      console.error('❌ AdminPrintPanel - Token verification error:', err);
-      setError(err?.response?.data?.message || err.message || "Failed to verify token.");
+      console.error('❌ AdminPrintPanel - Document fetch error:', err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch document.");
       setDoc(null); 
       setIntervalActive(false);
       setPrintStatus('error');
@@ -378,6 +399,7 @@ export default function AdminPrintPanel() {
     
     try {
       await api.post(`/print/${encodeURIComponent(doc.token)}`, null, { headers: authHeader(currentAuth.token) });
+      
       const today = new Date().toISOString().split("T")[0];
       const allStats = JSON.parse(localStorage.getItem("privyprint_local_stats") || "{}");
       const dayStats = allStats[today] || { bw: 0, color: 0, total: 0 };
@@ -421,6 +443,80 @@ export default function AdminPrintPanel() {
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Alert simulation failed.");
     }
+  }
+
+  // Color detection function
+  function detectImageColor(imageElement) {
+    if (!imageElement) return;
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = imageElement.naturalWidth;
+    canvas.height = imageElement.naturalHeight;
+    
+    ctx.drawImage(imageElement, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    let colorPixels = 0;
+    const totalPixels = canvas.width * canvas.height;
+    const sampleRate = Math.max(1, Math.floor(totalPixels / 10000)); // Sample max 10k pixels
+    
+    for (let i = 0; i < data.length; i += 4 * sampleRate) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Check if pixel is not grayscale (RGB values are not similar)
+      if (Math.abs(r - g) > 30 || Math.abs(g - b) > 30 || Math.abs(r - b) > 30) {
+        colorPixels++;
+      }
+    }
+    
+    const colorRatio = colorPixels / (totalPixels / sampleRate);
+    setIsGrayscale(colorRatio < 0.1); // Less than 10% color pixels = grayscale
+  }
+
+  // Preview controls
+  function handleZoomIn() {
+    setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  }
+
+  function handleZoomOut() {
+    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  }
+
+  function handleZoomReset() {
+    setZoomLevel(1);
+  }
+
+  function handleDownload() {
+    if (!doc?.fileUrl && !doc?.file) return;
+    const fileUrl = doc.fileUrl || doc.file;
+    const link = document.createElement('a');
+    link.href = `${apiBaseUrl}${fileUrl}`;
+    link.download = doc.token || 'document';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function handleImageLoad(e) {
+    setImageLoaded(true);
+    setPreviewLoading(false);
+    setPreviewError("");
+    
+    // Auto-detect color if it's an image
+    const fileUrl = doc.fileUrl || doc.file;
+    if (!fileUrl?.toLowerCase().endsWith('.pdf')) {
+      detectImageColor(e.target);
+    }
+  }
+
+  function handleImageError() {
+    setPreviewLoading(false);
+    setPreviewError("Failed to load document preview");
+    setImageLoaded(false);
   }
 
   const watermarkText = doc?.token && watermarkTime
@@ -517,9 +613,9 @@ export default function AdminPrintPanel() {
           </motion.div>
 
           {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid lg:grid-cols-3 gap-8">
             {/* Left Column - Token Input & Document Preview */}
-            <div className="space-y-6">
+            <div className="lg:col-span-2 space-y-6">
               {/* Token Input Card */}
               <GlassCard accent="#FF6B35">
                 <div className="p-8">
@@ -536,7 +632,7 @@ export default function AdminPrintPanel() {
                     icon={Key}
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="SPX-1234"
+                    placeholder="SPX-XXXXX"
                     disabled={isPrinting}
                     accent="#FF6B35"
                   />
@@ -588,13 +684,108 @@ export default function AdminPrintPanel() {
                     }}>
                     {doc ? (
                       <>
-                        {doc.fileUrl?.toLowerCase().endsWith(".pdf") ? (
-                          <iframe title="Document Preview" src={`${apiBaseUrl}${doc.fileUrl}`}
-                            style={{ width: "100%", height: 280, border: 0 }} />
-                        ) : (
-                          <img src={`${apiBaseUrl}${doc.fileUrl}`} alt="Document"
-                            style={{ width: "100%", height: "auto", maxHeight: 280, objectFit: "contain" }} />
+                        {/* Preview Controls */}
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg backdrop-blur-sm"
+                            style={{ background: "rgba(0,0,0,0.7)" }}>
+                            <button
+                              onClick={handleZoomOut}
+                              className="p-1 rounded hover:bg-white/10 transition-colors"
+                              style={{ color: "rgba(255,255,255,0.7)" }}
+                            >
+                              <ZoomOut className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-medium px-2" style={{ color: "rgba(255,255,255,0.9)" }}>
+                              {Math.round(zoomLevel * 100)}%
+                            </span>
+                            <button
+                              onClick={handleZoomIn}
+                              className="p-1 rounded hover:bg-white/10 transition-colors"
+                              style={{ color: "rgba(255,255,255,0.7)" }}
+                            >
+                              <ZoomIn className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={handleZoomReset}
+                              className="p-1 rounded hover:bg-white/10 transition-colors"
+                              style={{ color: "rgba(255,255,255,0.7)" }}
+                            >
+                              <RotateCw className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={handleDownload}
+                              className="p-1 rounded hover:bg-white/10 transition-colors"
+                              style={{ color: "rgba(255,255,255,0.7)" }}
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Color Type Badge */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <div className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
+                            doc.type === "Color" 
+                              ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-300"
+                              : "bg-gradient-to-r from-gray-500/20 to-slate-500/20 border border-gray-500/30 text-gray-300"
+                          }`}>
+                            {doc.type === "Color" ? "🎨 Color" : "⚫ B&W"}
+                          </div>
+                        </div>
+
+                        {/* Loading State */}
+                        {previewLoading && (
+                          <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm"
+                            style={{ background: "rgba(0,0,0,0.7)" }}>
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                            />
+                          </div>
                         )}
+
+                        {/* Document Preview */}
+                        <div className="w-full h-full overflow-auto" style={{ maxHeight: 400 }}>
+                          {(() => {
+                            const fileUrl = doc.fileUrl || doc.file;
+                            if (!fileUrl) return null;
+                            
+                            return fileUrl.toLowerCase().endsWith(".pdf") ? (
+                              <iframe 
+                                title="Document Preview" 
+                                src={`${apiBaseUrl}${fileUrl}`}
+                                style={{ 
+                                  width: "100%", 
+                                  height: 400, 
+                                  border: 0,
+                                  transform: `scale(${zoomLevel})`,
+                                  transformOrigin: "top center",
+                                  transition: "transform 0.3s ease"
+                                }} 
+                              />
+                            ) : (
+                              <img 
+                                src={`${apiBaseUrl}${fileUrl}`} 
+                                alt="Document"
+                                onLoad={handleImageLoad}
+                                onError={handleImageError}
+                                style={{ 
+                                  width: "100%", 
+                                  height: "auto", 
+                                  maxHeight: "400px", 
+                                  objectFit: "contain",
+                                  filter: isGrayscale ? 'grayscale(100%)' : 'none',
+                                  display: imageLoaded ? 'block' : 'none',
+                                  transform: `scale(${zoomLevel})`,
+                                  transformOrigin: "top center",
+                                  transition: "transform 0.3s ease"
+                                }} 
+                              />
+                            );
+                          })()}
+                        </div>
+                        
                         {watermarkText && (
                           <div className="absolute top-4 left-0 right-0 flex justify-center pointer-events-none">
                             <div className="px-4 py-2 rounded-lg backdrop-blur-sm border border-dashed"
@@ -771,6 +962,13 @@ export default function AdminPrintPanel() {
                   </p>
                 </div>
               </GlassCard>
+            </div>
+
+            {/* History Section - Full Width Bottom */}
+            <div className="lg:col-span-3">
+              <div className="h-96">
+                <PrintHistory />
+              </div>
             </div>
           </div>
 

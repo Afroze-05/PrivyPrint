@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
-import { setAuth } from "../../services/authStorage";
+import { setAuth, getAuth } from "../../services/authStorage";
 
 import { motion } from "framer-motion";
 import {
@@ -29,6 +29,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", { email, password });
+      console.log("Admin login response:", res.data);
       const { token, user } = res.data;
 
       if (user.role !== "admin") {
@@ -36,9 +37,19 @@ export default function AdminLogin() {
         return;
       }
 
-      setAuth({ token, ...user });
+      // Store auth data in correct format
+      const authData = { token, user };
+      console.log("Storing admin auth data:", authData);
+      setAuth(authData);
+      
+      // Verify it was stored
+      const storedAuth = getAuth();
+      console.log("Stored admin auth:", storedAuth);
+      
+      console.log("Admin login successful, redirecting to dashboard");
       navigate("/admin/dashboard");
     } catch (err) {
+      console.error("Admin login error:", err);
       setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {
       setLoading(false);

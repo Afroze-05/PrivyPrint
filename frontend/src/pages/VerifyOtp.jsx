@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
+import { setAuth } from "../services/authStorage";
 import { motion, AnimatePresence } from "framer-motion";
 console.log(motion, api);
 import {
@@ -81,40 +82,34 @@ export default function VerifyOtp() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, otp: otp }),
-      });
+      const res = await api.post("/auth/verify-otp", { email, otp });
+      console.log("OTP verification response:", res.data);
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (res.data.token && res.data.user) {
         // 1. Trigger the success animation
         setSuccess(true);
 
-        // 2. Get the role from the state we passed from Signup
-        const userRole = location.state?.role;
+        // 2. Store authentication data properly
+        setAuth({ token: res.data.token, user: res.data.user });
+        console.log("Auth data stored successfully");
 
-        // 3. Optional: If your verify-otp returns token/user, set it like your login
-        if (data.token && data.user) {
-          // setAuth({ token: data.token, ...data.user }); // If using AuthContext
-          localStorage.setItem("token", data.token);
-        }
+        // 3. Get the role from the user data
+        const userRole = res.data.user.role;
 
         // 4. Final Conditional Redirect
         setTimeout(() => {
           if (userRole === "admin") {
             navigate("/admin/dashboard");
           } else {
-            navigate("/upload");
+            navigate("/dashboard");
           }
         }, 1500); // 1.5s delay to show the success checkmark
       } else {
-        setError(data.message || "Invalid OTP");
+        setError("Invalid response from server");
       }
     } catch (err) {
-      setError("Server error");
+      setError(err?.response?.data?.message || "Server error");
+      console.log("OTP verification error:", err);
     } finally {
       setLoading(false);
     }
@@ -125,8 +120,8 @@ export default function VerifyOtp() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
-      <div className="absolute inset-0 bg-gradient-to-t from-orange-950/20 via-transparent to-amber-950/20" />
+      <div className="absolute inset-0 bg-linear-to-br from-black via-gray-900 to-black" />
+      <div className="absolute inset-0 bg-linear-to-t from-orange-950/20 via-transparent to-amber-950/20" />
 
       {/* Animated Orbs */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
@@ -161,7 +156,7 @@ export default function VerifyOtp() {
           }}
         >
           {/* Glow Effect */}
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 pointer-events-none" />
+          <div className="absolute inset-0 rounded-3xl bg-linear-to-r from-orange-500/10 to-amber-500/10 pointer-events-none" />
 
           <div className="relative p-8">
             {/* Success State */}
@@ -176,7 +171,7 @@ export default function VerifyOtp() {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                  className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/25"
+                  className="w-20 h-20 bg-linear-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/25"
                 >
                   <CheckCircle2 className="w-10 h-10 text-white" />
                 </motion.div>
@@ -209,7 +204,7 @@ export default function VerifyOtp() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.5 }}
-                    className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25"
+                    className="w-16 h-16 bg-linear-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25"
                   >
                     <Shield className="w-8 h-8 text-white" />
                   </motion.div>
@@ -282,7 +277,7 @@ export default function VerifyOtp() {
                         exit={{ opacity: 0, y: -10 }}
                         className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl"
                       >
-                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
                         <span className="text-red-400 text-sm">{error}</span>
                       </motion.div>
                     )}
@@ -299,12 +294,12 @@ export default function VerifyOtp() {
                     onClick={handleVerify}
                     className={`w-full py-4 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 relative overflow-hidden group z-20 cursor-pointer pointer-events-auto ${
                       otp.length === 6 && !loading
-                        ? "bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 ring-2 ring-orange-500/50 ring-offset-0 ring-offset-transparent"
+                        ? "bg-linear-to-r from-orange-500 to-amber-500 shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 ring-2 ring-orange-500/50 ring-offset-0 ring-offset-transparent"
                         : "bg-gray-600 opacity-50 cursor-not-allowed"
                     }`}
                     style={{ fontFamily: '"Inter Tight", sans-serif' }}
                   >
-                    <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                    <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                     <span className="relative flex items-center justify-center gap-2">
                       {loading ? (
                         <>

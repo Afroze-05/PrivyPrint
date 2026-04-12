@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../services/api";
-import { setAuth } from "../services/authStorage";
+import { setAuth, getAuth } from "../services/authStorage";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Mail, Lock, ArrowRight, FileText, UserPlus } from "lucide-react";
 
@@ -48,7 +48,7 @@ export default function CustomerSignup() {
       const loginRes = await api.post("/auth/login", { email, password });
       const { token, user } = loginRes.data;
       setAuth({ token, ...user });
-      navigate("/upload");
+      navigate("/dashboard");
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "Login failed.");
     } finally {

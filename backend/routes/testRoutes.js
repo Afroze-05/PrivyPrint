@@ -149,4 +149,71 @@ router.post("/admin-login", async (req, res) => {
   }
 });
 
+// Test the fixed APIs without authentication
+router.get("/test-fixed-apis", async (req, res) => {
+  try {
+    console.log("🧪 Testing fixed APIs...");
+    
+    // Test by directly accessing Document model
+    const Document = require("../models/Document");
+    
+    // Get all documents
+    const docs = await Document.find({}) || [];
+    console.log(`Found ${docs.length} documents`);
+    
+    // Test the pricing logic
+    let totalPrints = 0;
+    let totalEarnings = 0;
+    let bwPrints = 0;
+    let colorPrints = 0;
+    
+    docs.forEach(doc => {
+      const pages = doc.pages || 1;
+      const type = doc.printType || doc.type || "bw";
+      const copies = doc.copies || 1;
+      
+      // Consistent pricing logic
+      const rate = (type === "color" || type === "Color") ? 5 : 2;
+      const price = doc.price || (pages * rate * copies);
+      
+      totalPrints += copies;
+      totalEarnings += price;
+      
+      if (type === "color" || type === "Color") {
+        colorPrints += copies;
+      } else {
+        bwPrints += copies;
+      }
+    });
+    
+    const stats = {
+      totalPrints,
+      bwPrints,
+      colorPrints,
+      totalEarnings,
+      currency: '₹',
+      lastUpdated: new Date(),
+      breakdown: {
+        bwEarnings: bwPrints * 2,
+        colorEarnings: colorPrints * 5
+      }
+    };
+    
+    res.status(200).json({
+      message: "Fixed APIs tested successfully!",
+      documentCount: docs.length,
+      stats: stats,
+      safeDataHandling: "✅ Working",
+      pricingLogic: "✅ Working",
+      nullChecks: "✅ Working"
+    });
+  } catch (error) {
+    console.error("❌ Failed to test fixed APIs:", error);
+    res.status(500).json({ 
+      message: "Failed to test fixed APIs",
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;

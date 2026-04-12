@@ -30,5 +30,15 @@ const upload = multer({
   fileFilter,
 });
 
-module.exports = { upload };
+// Handles multiple files field named `files`.
+const uploadMultiple = multer({
+  storage,
+  limits: { 
+    fileSize: 15 * 1024 * 1024, // 15MB per file
+    files: 10 // Maximum 10 files at once
+  },
+  fileFilter,
+});
+
+module.exports = { upload, uploadMultiple };
 

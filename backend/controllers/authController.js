@@ -1,97 +1,3 @@
-// const bcrypt = require("bcrypt");
-// const jwt = require("jsonwebtoken");
-
-// const User = require("../models/User");
-
-// function signJWT(user) {
-//   const payload = { id: user._id.toString(), role: user.role };
-//   return jwt.sign(payload, process.env.JWT_SECRET, {
-//     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-//   });
-// }
-
-// async function signup(req, res) {
-//   try {
-//     const { name, email, password, role } = req.body;
-
-//     if (!name || !email || !password) {
-//       return res.status(400).json({ message: "name, email, and password are required." });
-//     }
-
-//     const normalizedRole = role || "customer";
-//     if (!["admin", "customer"].includes(normalizedRole)) {
-//       return res.status(400).json({ message: "role must be 'admin' or 'customer'." });
-//     }
-
-//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-//     if (!emailRegex.test(email)) {
-//       return res.status(400).json({ message: "Invalid email format." });
-//     }
-
-//     const existing = await User.findOne({ email: email.toLowerCase().trim() });
-//     if (existing) {
-//       return res.status(409).json({ message: "Email already registered." });
-//     }
-
-//     const saltRounds = 10;
-//     const passwordHash = await bcrypt.hash(password, saltRounds);
-
-//     const user = await User.create({
-//       name: name.trim(),
-//       email: email.toLowerCase().trim(),
-//       password: passwordHash,
-//       role: normalizedRole,
-//       trustScore: 100,
-//     });
-
-//     return res.status(201).json({
-//       id: user._id,
-//       name: user.name,
-//       email: user.email,
-//       role: user.role,
-//       trustScore: user.trustScore,
-//     });
-//   } catch (err) {
-//     return res.status(500).json({ message: "Signup failed.", error: err.message });
-//   }
-// }
-
-// async function login(req, res) {
-//   try {
-//     const { email, password } = req.body;
-
-//     if (!email || !password) {
-//       return res.status(400).json({ message: "email and password are required." });
-//     }
-
-//     const user = await User.findOne({ email: email.toLowerCase().trim() }).select("+password");
-//     if (!user) {
-//       return res.status(401).json({ message: "Invalid email or password." });
-//     }
-
-//     const ok = await bcrypt.compare(password, user.password);
-//     if (!ok) {
-//       return res.status(401).json({ message: "Invalid email or password." });
-//     }
-
-//     const token = signJWT(user);
-
-//     return res.status(200).json({
-//       token,
-//       user: {
-//         id: user._id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role,
-//         trustScore: user.trustScore,
-//       },
-//     });
-//   } catch (err) {
-//     return res.status(500).json({ message: "Login failed.", error: err.message });
-//   }
-// }
-
-// module.exports = { signup, login };
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
@@ -129,13 +35,13 @@ async function signup(req, res) {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Ensure OTP is exactly 6 digits
     if (otp.length !== 6) {
       console.error("Generated OTP is not 6 digits:", otp);
       return res.status(500).json({ message: "OTP generation failed" });
     }
-    
+
     console.log("🔢 Generated 6-digit OTP:", otp);
     const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
 
@@ -181,18 +87,18 @@ async function verifyOTP(req, res) {
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
-        message: "Email and OTP are required"
+        message: "Email and OTP are required",
       });
     }
-    
+
     // Validate OTP format (must be exactly 6 digits)
     if (!/^[0-9]{6}$/.test(otp.toString().trim())) {
       return res.status(400).json({
         success: false,
-        message: "Invalid OTP format. OTP must be exactly 6 digits."
+        message: "Invalid OTP format. OTP must be exactly 6 digits.",
       });
     }
-    
+
     console.log("🔍 Verifying OTP:", { email, otp });
 
     // Normalizing input to match signup storage
@@ -211,16 +117,19 @@ async function verifyOTP(req, res) {
     // B. Strict OTP validation - check if code matches exactly
     const storedOtp = user.otp?.toString();
     const enteredOtp = otp?.toString().trim();
-    
+
     if (storedOtp !== enteredOtp) {
-      console.log("❌ OTP mismatch:", { stored: storedOtp, entered: enteredOtp });
+      console.log("OTP mismatch:", {
+        stored: storedOtp,
+        entered: enteredOtp,
+      });
       return res.status(400).json({
         success: false,
-        message: "Incorrect OTP"
+        message: "Incorrect OTP",
       });
     }
-    
-    console.log("✅ OTP verification successful");
+
+    console.log("OTP verification successful");
 
     // C. Update User Status
     user.isVerified = true;
@@ -228,9 +137,20 @@ async function verifyOTP(req, res) {
     user.otpExpires = undefined;
     await user.save();
 
+    // D. Generate JWT token for automatic login after verification
+    const token = signJWT(user);
+
     res.status(200).json({
       success: true,
-      message: "Verification successful!"
+      message: "Verification successful!",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        trustScore: user.trustScore,
+      },
     });
   } catch (err) {
     res
@@ -301,19 +221,21 @@ async function verifyToken(req, res) {
 
     // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Find user by ID from token
     const user = await User.findById(decoded.id);
-    
+
     if (!user) {
-      return res.status(401).json({ message: "Invalid token - user not found." });
+      return res
+        .status(401)
+        .json({ message: "Invalid token - user not found." });
     }
 
     // Check if user is verified
     if (!user.isVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: "Account not verified. Please check your email for the OTP.",
-        notVerified: true 
+        notVerified: true,
       });
     }
 
@@ -325,16 +247,18 @@ async function verifyToken(req, res) {
         email: user.email,
         role: user.role,
         trustScore: user.trustScore,
-      }
+      },
     });
   } catch (err) {
-    if (err.name === 'JsonWebTokenError') {
+    if (err.name === "JsonWebTokenError") {
       return res.status(401).json({ message: "Invalid token." });
     }
-    if (err.name === 'TokenExpiredError') {
+    if (err.name === "TokenExpiredError") {
       return res.status(401).json({ message: "Token expired." });
     }
-    return res.status(500).json({ message: "Token verification failed.", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Token verification failed.", error: err.message });
   }
 }
 
