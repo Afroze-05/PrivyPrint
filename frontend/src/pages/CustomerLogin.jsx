@@ -5,6 +5,14 @@ import { api } from "../services/api";
 import { setAuth, getAuth } from "../services/authStorage";
 import { LogIn, Mail, Lock, ArrowRight, ShieldCheck, FileText } from "lucide-react";
 
+
+
+// Taking email & password
+// ✔ Sending login request to backend
+// ✔ Storing JWT token
+// ✔ Redirecting to dashboard
+// ✔ Showing UI with animations
+
 export default function CustomerLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");

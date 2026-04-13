@@ -16,9 +16,9 @@ export default function CustomerSignup() {
   const [error, setError] = useState("");
 
   async function handleCreateAccount(e) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+    e.preventDefault();   //Don’t refresh page" 
+    setError("");         //Clear old warning message
+    setLoading(true);     //Show processing... and spinning
     try {
       console.log("Signup attempt:", { name, email, password, role: "customer" });
       
