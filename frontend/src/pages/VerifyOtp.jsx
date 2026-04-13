@@ -12,17 +12,23 @@ import {
   Mail,
 } from "lucide-react";
 
+// Taking 6-digit OTP from user
+//  Sending OTP + email to backend
+//  Verifying OTP
+//  Logging user in automatically
+//  Redirecting to dashboard
+
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const location = useLocation();
+  const location = useLocation();  //GET EMAIL FROM PREVIOUS PAGE
   const navigate = useNavigate();
-  const email = location.state?.email;
-  const inputRefs = useRef([]);
+  const email = location.state?.email;  //Email comes from signup page
+  const inputRefs = useRef([]);       //Used to control 6 input boxes
 
-  // Auto-focus first input on mount
+  // Auto-focus first input when clicked
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
@@ -38,10 +44,10 @@ export default function VerifyOtp() {
     // Only allow single digit (0-9)
     if (!/^[0-9]?$/.test(value)) return;
 
-    const newOtp = otp.split("");
-    newOtp[index] = value;
-    const otpString = newOtp.join("");
-    setOtp(otpString);
+    const newOtp = otp.split("");  //otp = "12" ,  newOtp = ["1", "2"]
+    newOtp[index] = value;         //index = 2, value=5, ["1","2","5"]
+    const otpString = newOtp.join("");   //["1", "2", "5"] → "125"
+    setOtp(otpString);     //React stores updated OTP
     console.log("OTP updated:", otpString); // Debug OTP update
 
     // Auto-focus next input
@@ -59,10 +65,10 @@ export default function VerifyOtp() {
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData
+    const pastedData = e.clipboardData  //if user copies- "Your OTP is 123456"
       .getData("text")
-      .replace(/\D/g, "")
-      .slice(0, 6);
+      .replace(/\D/g, "")      //Remove non-numbers , \D = anything NOT a digit
+      .slice(0, 6);            //limit is 6 digits only
     const newOtp = pastedData.padEnd(6, "");
     setOtp(newOtp);
 

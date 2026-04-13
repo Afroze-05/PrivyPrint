@@ -29,11 +29,12 @@ export default function VerifyOtp() {
     // Only allow single digit (0-9)
     if (!/^[0-9]?$/.test(value)) return;
     
-    const newOtp = otp.split(" \);
-    newOtp[index] = value;
-    setOtp(newOtp);
-    console.log("OTP updated:", newOtp); // Debug OTP update
-
+    const newOtp = otp.split("");  //otp = "12" ,  newOtp = ["1", "2"]
+    newOtp[index] = value;         //index = 2, value=5, ["1","2","5"]
+    const otpString = newOtp.join("");   //["1", "2", "5"] → "125"
+    setOtp(otpString);     //React stores updated OTP
+    console.log("OTP updated:", otpString); // Debug OTP update
+    
     // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
