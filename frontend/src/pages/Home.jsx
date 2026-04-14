@@ -360,140 +360,9 @@ export default function Home() {
   const navigate = useNavigate();
   const auth = getAuth();
 
-<<<<<<< HEAD
-  if (typeof window !== 'undefined') injectStyles();
 
-  const handleCustomer = () => {
-    if (auth?.token && auth.role === 'customer') navigate('/upload');
-    else navigate('/signup');
-  };
 
-  const portals = [
-    {
-      id: 'customer',
-      num: '01',
-      icon: '👤',
-      label: 'Customer',
-      desc: 'Upload documents and generate a secure one-time print token.',
-      arrow: 'Enter Portal',
-      cardClass: 'hm-portal-blue',
-      iconClass: 'hm-card-icon-blue',
-      labelClass: 'hm-card-label-blue',
-      arrowClass: 'hm-card-arrow-blue',
-      onClick: handleCustomer,
-    },
-    {
-      id: 'admin',
-      num: '02',
-      icon: '🛡',
-      label: 'Admin',
-      desc: 'Access the command panel to manage print jobs and users.',
-      arrow: 'Admin Login',
-      cardClass: 'hm-portal-red',
-      iconClass: 'hm-card-icon-red',
-      labelClass: 'hm-card-label-red',
-      arrowClass: 'hm-card-arrow-red',
-      onClick: () => navigate('/admin/login'),
-    },
-  ];
 
-  return (
-    <div className="hm-root">
-      <div className="hm-blob-blue" />
-      <div className="hm-blob-red" />
-      <div className="hm-grain" />
-      <div className="hm-grid" />
-
-      <div className="hm-anim-up" style={{ width: '100%', maxWidth: 560, position: 'relative', zIndex: 1 }}>
-
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="hm-anim-scale" style={{ display: 'inline-block', marginBottom: '1rem' }}>
-            <div className="hm-logo-chip">
-              <span className="hm-logo-dot" />
-              SecurePrint
-            </div>
-          </div>
-
-          {/* Show session badge if logged in */}
-          {auth?.token && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.65rem' }}>
-              <div className="hm-auth-badge">
-                <span className="hm-auth-dot" />
-                Session Active · {auth.name || auth.email}
-              </div>
-            </div>
-          )}
-
-          <h1 className="hm-heading hm-anim-up hm-d1">
-            Select<br />Your Portal
-          </h1>
-          <p className="hm-sub hm-anim-up hm-d2">
-            Choose an access level to continue
-          </p>
-        </div>
-
-        {/* Wrapper card */}
-        <div className="hm-wrapper hm-anim-up hm-d2">
-
-          <div className="hm-cards-grid">
-            {portals.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`hm-portal-card ${p.cardClass} hm-anim-up`}
-                style={{ animationDelay: `${0.22 + i * 0.1}s` }}
-                onClick={p.onClick}
-              >
-                {/* Card number */}
-                <span className="hm-card-num">{p.num}</span>
-
-                {/* Icon */}
-                <div className={`hm-card-icon ${p.iconClass}`}>
-                  {p.icon}
-                </div>
-
-                {/* Label */}
-                <h3 className={`hm-card-label ${p.labelClass}`}>{p.label}</h3>
-
-                {/* Desc */}
-                <p className="hm-card-desc">{p.desc}</p>
-
-                {/* Arrow CTA */}
-                <div className={`hm-card-arrow ${p.arrowClass}`}>
-                  <span className="hm-arrow-line" />
-                  {p.arrow}
-                  <span>→</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="hm-divider" style={{ marginTop: '1.5rem' }} />
-
-          {/* Footer note */}
-          <div style={{
-            marginTop: '1rem',
-            fontFamily: "'DM Mono', monospace",
-            fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.15)',
-            textAlign: 'center',
-          }}>
-            All sessions are end-to-end encrypted
-          </div>
-        </div>
-
-        {/* Trust badges */}
-        <div className="hm-trust-row hm-anim-up hm-d4">
-          {['256-bit AES', 'Zero Logs', 'GDPR Ready'].map((t) => (
-            <div key={t} className="hm-trust-badge">
-              <span className="hm-trust-dot-green" />
-              {t}
-            </div>
-          ))}
-        </div>
-
-=======
   const cards = [
     {
       icon: <User className="w-5 h-5" />,
@@ -722,7 +591,7 @@ export default function Home() {
             </span>
           </div>
         </motion.div>
->>>>>>> 169ad32859c812165053aa6adac6e5d2634d2dc5
+
       </div>
     </div>
   );
