@@ -1,128 +1,294 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, Button, Input } from '../components/UI';
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { api } from "../services/api"; // Import api service
+import {
+  Upload,
+  ArrowLeft,
+  ChevronRight,
+  AlertTriangle,
+  X,
+} from "lucide-react";
+
+/* ── Background Components (Noise, Grid, Orb) ── */
+const NoiseSVG = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-[0.035] pointer-events-none z-0"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <filter id="noise">
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.68"
+        numOctaves="3"
+        stitchTiles="stitch"
+      />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
+
+const GridDots = () => (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: `radial-gradient(circle, rgba(255, 107, 53, 0.3) 1px, transparent 1px)`,
+      backgroundSize: "36px 36px",
+      opacity: 0.03,
+    }}
+  />
+);
+
+const GlowOrb = ({ color, size, top, left, delay = 0 }) => (
+  <motion.div
+    className="absolute rounded-full blur-3xl pointer-events-none"
+    style={{ width: size, height: size, top, left, background: color }}
+    animate={{
+      scale: [1, 1.1, 1.05, 1.15, 1],
+      opacity: [0.08, 0.12, 0.1, 0.15, 0.08],
+    }}
+    transition={{ duration: 12, repeat: Infinity, delay, ease: "easeInOut" }}
+  />
+);
 
 export default function UploadPage() {
   const navigate = useNavigate();
-  const [file, setFile] = useState(null);
-  const [printType, setPrintType] = useState('B/W');
+  const fileInputRef = useRef(null);
+  const [files, setFiles] = useState([]);
   const [dragOver, setDragOver] = useState(false);
+  const [printType, setPrintType] = useState("B/W"); // Default print type
+  const [copies, setCopies] = useState(1); // Default copies
 
-  const handleUpload = (e) => {
-    e.preventDefault();
-    const randomToken = `SPX-${Math.floor(1000 + Math.random() * 9000)}`;
-    localStorage.setItem('activeToken', randomToken);
-    localStorage.setItem('printType', printType);
-    navigate('/token');
-  };
-
-  const handleDrop = (e) => {
+  function handleFileDrop(e) {
     e.preventDefault();
     setDragOver(false);
-    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    const droppedFiles = Array.from(e.dataTransfer?.files || []);
+    if (droppedFiles.length > 0) {
+      setFiles(prevFiles => [...prevFiles, ...droppedFiles]);
+    }
+  }
+
+  function removeFile(index) {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+  }
+
+  function handleFileChange(e) {
+    const selectedFiles = Array.from(e.target.files || []);
+    setFiles(selectedFiles);
+  }
+
+  function generateToken() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let token = "SPX-";
+    for (let i = 0; i < 5; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+  }
+
+  const handleGenerateToken = async () => {
+    if (files.length === 0) {
+      alert("Please upload at least one file");
+      return;
+    }
+    
+    const tokenValue = generateToken();
+    console.log("Generated Token:", tokenValue);
+    
+    const formData = new FormData();
+    // Fix multiple file upload
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    formData.append("token", tokenValue);
+    formData.append("printType", printType);
+    formData.append("copies", copies);
+
+    try {
+      const response = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const tokenData = {
+        token: tokenValue,
+        status: "waiting",
+        createdAt: Date.now(),
+        fileName: files[0].name,
+      };
+
+      // Store token properly in localStorage
+      localStorage.setItem("customerToken", JSON.stringify(tokenData));
+      
+      console.log("Token stored and sent to backend:", tokenValue);
+      console.log("Navigating to token page...");
+      navigate("/token");
+    } catch (error) {
+      console.error("Error uploading document and token:", error);
+      alert("Failed to upload document and generate token. Please try again.");
+    }
   };
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ background: 'linear-gradient(160deg, #F5F5DC 0%, #EEF5FF 100%)' }}
+      className="relative min-h-screen overflow-hidden flex items-center justify-center"
+      style={{
+        background:
+          "linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #111111 100%)",
+        fontFamily: '"Inter", sans-serif',
+      }}
     >
-      <div className="w-full max-w-lg animate-fade-in-up">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center text-2xl"
-            style={{
-              background: 'linear-gradient(135deg, #1565C0, #0A192F)',
-              boxShadow: '0 8px 24px rgba(21,101,192,0.35)',
-            }}
-          >
-            📄
-          </div>
-          <h1 className="text-3xl font-black text-[#0A192F]">Upload Document</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Encrypted end-to-end · Auto-deleted after printing
-          </p>
-        </div>
+      <NoiseSVG />
+      <GridDots />
+      <GlowOrb color="#FF6B35" size={600} top="-10%" left="-5%" delay={0} />
+      <GlowOrb color="#FF8A50" size={400} top="40%" left="60%" delay={3} />
 
-        <Card className="p-8">
-          <form onSubmit={handleUpload} className="space-y-6">
-            {/* Drop zone */}
+      {/* Upload Form Container - Perfectly Centered */}
+      <div className="relative z-10 w-full max-w-2xl px-6 py-12">
+        {/* Back Button */}
+        <motion.button
+          onClick={() => navigate("/home")}
+          className="absolute -top-16 left-0 flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-400 hover:text-[#FF6B35] transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-medium">Back</span>
+        </motion.button>
+
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full"
+        >
+          <h1 className="text-5xl md:text-7xl font-bold mb-8 text-[#EAEAEA] leading-tight text-center">
+            Upload <span className="text-[#FF6B35]">Document</span>
+          </h1>
+
+          <div className="relative backdrop-blur-xl border border-white/10 rounded-2xl p-8 overflow-hidden bg-white/5 shadow-2xl">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              className="relative rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-300 cursor-pointer"
-              style={{
-                borderColor: file ? '#43A047' : dragOver ? '#1565C0' : '#D1D5DB',
-                background: file
-                  ? 'rgba(67,160,71,0.05)'
-                  : dragOver
-                  ? 'rgba(21,101,192,0.05)'
-                  : '#FAFAFA',
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
               }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleFileDrop}
+              className={`cursor-pointer border-2 border-dashed rounded-xl p-8 mb-6 flex flex-col items-center gap-4 transition-all ${dragOver ? "border-[#FF6B35] bg-[#FF6B35]/5" : "border-white/10 bg-white/5"}`}
             >
-              <input
-                type="file"
-                id="file-upload"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files[0])}
+              <Upload
+                className={`w-8 h-8 ${dragOver ? "text-[#FF6B35]" : "text-gray-500"}`}
               />
-              <label htmlFor="file-upload" className="cursor-pointer block">
-                <div className="text-5xl mb-3">
-                  {file ? '✅' : dragOver ? '📂' : '📁'}
-                </div>
-                <p className="font-bold text-[#0A192F] text-base">
-                  {file ? file.name : 'Drag & drop or click to browse'}
+              <div className="text-center">
+                <p className="text-sm font-medium text-white">
+                  {files.length === 0 ? "Select your files" : `${files.length} file(s) selected`}
                 </p>
-                <p className="text-xs text-gray-400 mt-1.5 font-medium">
-                  PDF · DOCX · PNG — Max 10 MB
+                <p className="text-xs text-gray-500 mt-1">
+                  PDF or Images supported (multiple files allowed)
                 </p>
-              </label>
-            </div>
-
-            {/* Print mode */}
-            <div>
-              <label className="block text-xs font-bold text-[#0A192F] uppercase tracking-widest mb-3">
-                Print Mode
-              </label>
-              <div className="flex gap-3">
-                {[
-                  { type: 'B/W', icon: '⬛', desc: 'Black & White' },
-                  { type: 'Color', icon: '🎨', desc: 'Full Color' },
-                ].map(({ type, icon, desc }) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setPrintType(type)}
-                    className="flex-1 py-4 rounded-2xl font-bold border-2 transition-all duration-200 text-sm flex flex-col items-center gap-1"
-                    style={{
-                      borderColor: printType === type ? '#1565C0' : '#E5E7EB',
-                      background: printType === type
-                        ? 'linear-gradient(135deg, #1565C0, #0D47A1)'
-                        : '#F9FAFB',
-                      color: printType === type ? '#fff' : '#9CA3AF',
-                      boxShadow: printType === type
-                        ? '0 4px 14px rgba(21,101,192,0.35)'
-                        : 'none',
-                      transform: printType === type ? 'translateY(-2px)' : 'none',
-                    }}
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <span>{desc}</span>
-                  </button>
-                ))}
               </div>
             </div>
 
-            {/* Copies */}
-            <Input label="Number of Copies" type="number" defaultValue="1" min="1" />
+            {/* File List */}
+            {files.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Selected Files:</h3>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {files.map((file, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-[#1a1a1a] border border-white/10 rounded-xl"
+                    >
+                      {/* File Info Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-2 h-2 bg-[#FF6B35] rounded-full flex-shrink-0"></div>
+                          <span className="text-sm text-gray-300 truncate font-medium">
+                            {file.name}
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0">
+                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile(index);
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            <Button type="submit" className="w-full py-4 text-base mt-2">
-              🔒 &nbsp; Generate Secure Token
-            </Button>
-          </form>
-        </Card>
+            {/* Print Options */}
+            <div className="mb-6 p-4 border border-white/10 rounded-xl bg-white/5">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Print Options:</h3>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-white text-sm">
+                  <input
+                    type="radio"
+                    name="printType"
+                    value="B/W"
+                    checked={printType === "B/W"}
+                    onChange={() => setPrintType("B/W")}
+                    className="form-radio text-[#FF6B35]"
+                  />
+                  Black & White
+                </label>
+                <label className="flex items-center gap-2 text-white text-sm">
+                  <input
+                    type="radio"
+                    name="printType"
+                    value="Color"
+                    checked={printType === "Color"}
+                    onChange={() => setPrintType("Color")}
+                    className="form-radio text-[#FF6B35]"
+                  />
+                  Color
+                </label>
+              </div>
+              <div className="mt-4">
+                <label htmlFor="copies" className="block text-white text-sm font-medium mb-2">
+                  Copies:
+                </label>
+                <input
+                  type="number"
+                  id="copies"
+                  value={copies}
+                  onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value)))}
+                  min="1"
+                  className="w-24 p-2 rounded-md bg-[#1a1a1a] border border-white/10 text-white"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerateToken}
+              disabled={files.length === 0}
+              className="w-full bg-[#FF6B35] hover:bg-[#FF8A50] disabled:opacity-50 py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all"
+            >
+              Generate Token
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

@@ -1,23 +1,16 @@
-function randomBase36(len) {
-  return Math.random().toString(36).slice(2, 2 + len).toUpperCase();
-}
-
 /**
  * Generates token in the required form:
- * - SPX-1234 (digits)
- * - SPX-A7K9P2 (alphanumeric)
+ * - SPX- prefix
+ * - 5 random characters
+ * - Example: SPX-A9K2Z
  */
 function generateToken() {
-  const useDigits = Math.random() < 0.5;
-
-  if (useDigits) {
-    const digits = Math.floor(1000 + Math.random() * 9000); // 4 digits
-    return `SPX-${digits}`;
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let token = "SPX-";
+  for (let i = 0; i < 5; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-
-  const len = 5 + Math.floor(Math.random() * 3); // 5-7 chars
-  return `SPX-${randomBase36(len)}`;
+  return token;
 }
 
 module.exports = { generateToken };
-
