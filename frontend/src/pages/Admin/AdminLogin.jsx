@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../services/api";
 import { setAuth, getAuth } from "../../services/authStorage";
-
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -23,11 +22,13 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+
   async function handleLogin(e) {
     e.preventDefault();
-    setError("");
+    setError('');
     setLoading(true);
     try {
+
       const res = await api.post("/auth/login", { email, password });
       console.log("Admin login response:", res.data);
       const { token, user } = res.data;
@@ -51,12 +52,14 @@ export default function AdminLogin() {
     } catch (err) {
       console.error("Admin login error:", err);
       setError(err?.response?.data?.message || err.message || "Login failed.");
+
     } finally {
       setLoading(false);
     }
   }
 
   return (
+
     <div
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
       style={{
@@ -312,3 +315,4 @@ export default function AdminLogin() {
     </div>
   );
 }
+
