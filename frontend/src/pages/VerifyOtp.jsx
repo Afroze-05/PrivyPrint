@@ -17,6 +17,7 @@ import {
 //  Verifying OTP
 //  Logging user in automatically
 //  Redirecting to dashboard
+//verify otp
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
