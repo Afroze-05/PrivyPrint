@@ -7,6 +7,7 @@ const sendEmail = require("../utils/sendEmail");
 function signJWT(user) {
   const payload = { id: user._id.toString(), role: user.role };
   return jwt.sign(payload, process.env.JWT_SECRET, {
+    //.sign()method to generate the token. It returns token as a string
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 }
@@ -22,7 +23,7 @@ async function signup(req, res) {
         .json({ message: "Name, email, and password are required." });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; //“One or more characters that are NOT space and NOT @”
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format." });
     }
@@ -31,7 +32,9 @@ async function signup(req, res) {
     const existing = await User.findOne({ email: normalizedEmail });
 
     if (existing) {
-      return res.status(409).json({ message: "Email already registered." });
+      return res
+        .status(409)
+        .json({ message: "Email already registered to PrivyPrint." });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -42,7 +45,7 @@ async function signup(req, res) {
       return res.status(500).json({ message: "OTP generation failed" });
     }
 
-    console.log("🔢 Generated 6-digit OTP:", otp);
+    console.log("Generated 6-digit OTP:", otp);
     const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
 
     const saltRounds = 10;
@@ -62,7 +65,7 @@ async function signup(req, res) {
     try {
       await sendEmail({
         email: user.email,
-        subject: "PrivyPrint - Verify your account",
+        subject: "PrivyPrint, Verify your account",
         message: `Your verification code is: ${otp}. It expires in 10 minutes.`,
       });
       return res.status(201).json({ message: "OTP sent to email." });
@@ -99,7 +102,7 @@ async function verifyOTP(req, res) {
       });
     }
 
-    console.log("🔍 Verifying OTP:", { email, otp });
+    console.log("Verifying OTP:", { email, otp });
 
     // Normalizing input to match signup storage
     const normalizedEmail = email?.toLowerCase().trim();
@@ -220,7 +223,7 @@ async function verifyToken(req, res) {
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); //it is a buit in function for verifying the token. It returns the decoded payload if the token is valid, otherwise it throws an error.
 
     // Find user by ID from token
     const user = await User.findById(decoded.id);
@@ -228,7 +231,7 @@ async function verifyToken(req, res) {
     if (!user) {
       return res
         .status(401)
-        .json({ message: "Invalid token - user not found." });
+        .json({ message: "Invalid token -> user not found." });
     }
 
     // Check if user is verified
@@ -277,5 +280,4 @@ const deleteAllUsers = async (req, res) => {
   }
 };
 
-// Exporting using CommonJS to match your require statements
 module.exports = { signup, login, verifyOTP, verifyToken, deleteAllUsers };

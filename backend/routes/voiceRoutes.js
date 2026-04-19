@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Voice = require("../models/Voice");
 
-// ── FIXED: authMiddleware exports { authMiddleware, requireRole } ──
+// ─ Renamed as protect
 const { authMiddleware: protect } = require("../middleware/authMiddleware");
 
 // POST — customer submits a voice request

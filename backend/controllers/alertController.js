@@ -1,9 +1,7 @@
 const nodemailer = require("nodemailer");
-
 const Alert = require("../models/Alert");
 const Document = require("../models/Document");
 const User = require("../models/User");
-
 const ALERT_TYPES = ["mobile_detected", "multiple_faces"];
 
 async function sendAlertEmail({ to, token, alertType }) {
@@ -17,23 +15,22 @@ async function sendAlertEmail({ to, token, alertType }) {
   } = process.env;
 
   if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASS || !EMAIL_FROM) {
-    // Keep the API functional even if email isn't configured.
     return { sent: false, reason: "Email env vars missing." };
   }
-
+  //trasporter is the object that is configured to send mail
+  //creating a email sendig system
   const transporter = nodemailer.createTransport({
     host: EMAIL_HOST,
     port: Number(EMAIL_PORT),
     secure: String(EMAIL_SECURE).toLowerCase() === "true",
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS }, //email of the sender and password of the sender email
   });
 
   const info = await transporter.sendMail({
     from: EMAIL_FROM,
     to,
-    subject: "SecurePrint Alert Triggered",
-    text: `SecurePrint reported alert: ${alertType}\nToken: ${token}`,
-    // You can optionally add an HTML version here later.
+    subject: "PrivyPrint Alert Triggered",
+    text: `PrivyPrint reported alert: ${alertType}\nToken: ${token}`,
   });
 
   return { sent: true, messageId: info.messageId };
@@ -69,7 +66,10 @@ async function createAlert(req, res) {
 
     // Send email to customer if we can resolve the document's customer.
     let emailResult = { sent: false, reason: "No matching document/user." };
-    const doc = await Document.findOne({ token }).populate("userId", "email name");
+    const doc = await Document.findOne({ token }).populate(
+      "userId",
+      "email name",
+    );
     if (doc?.userId?.email) {
       emailResult = await sendAlertEmail({
         to: doc.userId.email,
@@ -91,9 +91,10 @@ async function createAlert(req, res) {
       trustScore: updatedTrustScore,
     });
   } catch (err) {
-    return res.status(500).json({ message: "Failed to store alert.", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to store alert.", error: err.message });
   }
 }
 
 module.exports = { createAlert };
-
