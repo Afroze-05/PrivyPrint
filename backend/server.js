@@ -4,7 +4,8 @@ const cors = require("cors");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
-
+const http = require("http");
+const { Server } = require("socket.io");
 const authRoutes = require("./routes/authRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const alertRoutes = require("./routes/alertRoutes");
@@ -18,19 +19,31 @@ const ratingRoutes = require("./routes/ratingRoutes");
 const printRoutes = require("./routes/printRoute");
 
 const app = express();
-
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "https://privyprint-frontend.onrender.com",
+    ],
+    credentials: true,
+  },
+});
+app.set("io", io);
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:5175",
-      "https://privyprint-frontend.onrender.com" // ✅ ADD THIS
+      "https://privyprint-frontend.onrender.com", // ✅ ADD THIS
     ],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  })
+  }),
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -82,13 +95,14 @@ try {
   app.use("/api", logsRoutes);
   app.use("/api/test", testRoutes);
   app.use("/api/debug", testTokenRoutes);
+
   // app.use("/api/debug", debugRoutes);
   app.use("/api", adminRoutes);
   app.use("/api/rate", ratingRoutes);
-  app.use("/api", printRoutes); // ✅ voice print — single registration here
-  console.log("🔧 All routes registered");
+  app.use("/api", printRoutes); // voice print — single registration here
+  console.log(" All routes registered");
 } catch (error) {
-  console.error("❌ Error loading routes:", error);
+  console.error(" Error loading routes:", error);
 }
 
 app.use((req, res) => {
@@ -108,7 +122,8 @@ const PORT = process.env.PORT || 5000;
 
 (async () => {
   await connectDB();
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
+    // ← was app.listen, now httpServer.listen
     console.log(`SecurePrint backend listening on port ${PORT}`);
   });
 })();

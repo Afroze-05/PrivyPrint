@@ -61,7 +61,8 @@ async function getStats(req, res) {
       const key = d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
       return { date: key, count: printsByDayMap.get(key) || 0 };
     });
-
+    const io = req.app.get("io");
+    if (io) io.emit("stats-updated", { totalUsers, totalPrints, trustScore });
     return res.status(200).json({
       totalUsers,
       totalPrints,
