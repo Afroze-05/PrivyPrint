@@ -249,8 +249,7 @@ export default function PhoneDetection({ existingVideoRef }) {
   useEffect(() => {
     const loadModel = async () => {
       try {
-        await tf.ready(); //wait for tf to be ready before loading model
-        //as ai models take time to load, we set isModelLoaded to true only after successful loading to prevent detection logic from running prematurely.
+        await tf.ready(); //tf is used to run the cocossd ai model directly in the browser (it is like the engine to the model )
         const model = await cocoSsd.load(); //model is trained to detect phone and camera among other objects, we will use it to detect if user has phone or camera during printing session.
         modelRef.current = model;
         setIsModelLoaded(true);
@@ -291,18 +290,18 @@ export default function PhoneDetection({ existingVideoRef }) {
       const video = existingVideoRef.current;
       if (
         video &&
-        video.srcObject && // is the camera stream available on the video element? This checks if the video element has a srcObject, which is where the camera stream would be attached. If this is null or undefined, it means we don't have access to the camera stream through this video element.
+        video.srcObject && // Checks whether the camera stream is available on the video element? This checks if the video element has a srcObject, which is where the camera stream would be attached. If this is null or undefined, it means we don't have access to the camera stream through this video element.
         video.srcObject.active &&
         video.readyState >= 2
       ) {
         setIsCameraActive(true);
-        console.log("✅ Using existing camera stream for phone detection");
+        console.log(" Using existing camera stream for phone detection");
       } else if (retryCount < maxRetries) {
         retryCount++;
         setTimeout(checkCameraStream, 1000);
       } else {
         // Fallback: create own camera stream
-        console.log("⚠️ Using fallback camera for phone detection");
+        console.log(" Using fallback camera for phone detection");
         createFallbackCamera();
       }
     };
@@ -310,6 +309,7 @@ export default function PhoneDetection({ existingVideoRef }) {
     const createFallbackCamera = async () => {
       try {
         //Camera ON karna manually
+        // if camera is not available then we manually create it
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480 },
         });

@@ -344,7 +344,7 @@ export default function AdminDashboardNew() {
     setRealTimeLoading(true);
     try {
       const api = (await import("../../services/api")).api;
-      const response = await api.get("/documents/realtime-stats");
+      const response = await api.get("/realtime-stats");
       setRealTimeStats(response.data);
       setLastUpdated(new Date());
     } catch (err) {
@@ -364,7 +364,7 @@ export default function AdminDashboardNew() {
   async function loadEarningsHistory() {
     try {
       const api = (await import("../../services/api")).api;
-      const response = await api.get("/documents/earnings-history");
+      const response = await api.get("/earnings-history");
       setEarningsHistory(response.data);
     } catch (err) {
       console.error("Failed to load earnings history:", err);
