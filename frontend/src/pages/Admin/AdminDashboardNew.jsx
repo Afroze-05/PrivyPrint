@@ -184,6 +184,11 @@ export default function AdminDashboardNew() {
 
   const [activeTab, setActiveTab] = useState("dashboard");
 
+  // ── FIX: ratingsKey MUST be inside the component function ──
+  // Previously it was placed at line 56, outside the component,
+  // which causes a "Rules of Hooks" crash. Moved here correctly.
+  const [ratingsKey, setRatingsKey] = useState(0);
+
   // Voice requests state
   const [voiceRequests, setVoiceRequests] = useState([]);
   const [voiceRequestsLoading, setVoiceRequestsLoading] = useState(false);
@@ -193,11 +198,6 @@ export default function AdminDashboardNew() {
     navigate("/");
   };
 
-  // ─────────────────────────────────────────────────────
-  // FIX 1 + FIX 2: Single correct fetchVoiceRequests
-  // Uses direct fetch() with Authorization header instead
-  // of api.get() which was missing the auth header.
-  // ─────────────────────────────────────────────────────
   const fetchVoiceRequests = async () => {
     setVoiceRequestsLoading(true);
     try {
@@ -216,12 +216,6 @@ export default function AdminDashboardNew() {
     }
   };
 
-  // ─────────────────────────────────────────────────────
-  // FIX 3: Only ONE useEffect for voice tab polling.
-  // The original file had this block declared TWICE which
-  // caused the second to silently cancel the first,
-  // leaving voice requests never fetched.
-  // ─────────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab === "voice") {
       fetchVoiceRequests();
@@ -230,19 +224,18 @@ export default function AdminDashboardNew() {
     }
   }, [activeTab]);
 
+  // ── FIX: socket listener now also bumps ratingsKey so
+  //    RatingsSection re-fetches whenever stats-updated fires ──
   useEffect(() => {
     const socket = io("http://localhost:5000");
     socket.on("stats-updated", () => {
       loadRealTimeStats();
       loadEarningsHistory();
+      setRatingsKey((k) => k + 1); // triggers RatingsSection refresh
     });
     return () => socket.disconnect();
   }, []);
-  // ─────────────────────────────────────────────────────
-  // FIX 4: Status values changed from "processed" → "printed"
-  // to match what printRoute.js schema accepts:
-  // pending | printed | rejected
-  // ─────────────────────────────────────────────────────
+
   const updateVoiceRequestStatus = async (id, status) => {
     try {
       await fetch(`http://localhost:5000/api/voice-requests/${id}`, {
@@ -259,10 +252,6 @@ export default function AdminDashboardNew() {
     }
   };
 
-  // ─────────────────────────────────────────────────────
-  // FIX 5: Full 3-state style helper — covers
-  // pending (orange), printed (green), rejected (red)
-  // ─────────────────────────────────────────────────────
   const getVoiceStatusStyle = (status) => {
     if (status === "printed")
       return {
@@ -448,14 +437,14 @@ export default function AdminDashboardNew() {
     }
   }
 
-  // Initial data load — UNTOUCHED
+  // Initial data load
   useEffect(() => {
     loadStats();
     loadRealTimeStats();
     loadEarningsHistory();
   }, []);
 
-  // Real-time stats auto-refresh every 30s — UNTOUCHED
+  // Real-time stats auto-refresh every 30s
   useEffect(() => {
     const interval = setInterval(() => {
       loadRealTimeStats();
@@ -464,7 +453,7 @@ export default function AdminDashboardNew() {
     return () => clearInterval(interval);
   }, []);
 
-  // Stats + charts refresh every 60s — UNTOUCHED
+  // Stats + charts refresh every 60s
   useEffect(() => {
     const interval = setInterval(() => {
       loadStats();
@@ -473,12 +462,12 @@ export default function AdminDashboardNew() {
     return () => clearInterval(interval);
   }, [dateFilter]);
 
-  // Reload charts when filter changes — UNTOUCHED
+  // Reload charts when filter changes
   useEffect(() => {
     if (stats) loadChartData(dateFilter);
   }, [dateFilter, stats]);
 
-  // Load print history when tab opens — UNTOUCHED
+  // Load print history when tab opens
   useEffect(() => {
     if (activeTab === "history") loadPrintHistory();
   }, [activeTab]);
@@ -548,7 +537,13 @@ export default function AdminDashboardNew() {
                   key={key}
                   whileHover={{ scale: 1.02, x: 4 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab(key)}
+                  onClick={() => {
+                    setActiveTab(key);
+                    // ── FIX: bump ratingsKey each time the Ratings
+                    //    tab is clicked so RatingsSection remounts
+                    //    and re-fetches fresh data ──
+                    if (key === "ratings") setRatingsKey((k) => k + 1);
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
                   style={{
                     background:
@@ -715,7 +710,7 @@ export default function AdminDashboardNew() {
           </motion.div>
 
           {/* ════════════════════════════════════════
-              DASHBOARD TAB — UNTOUCHED
+              DASHBOARD TAB
           ════════════════════════════════════════ */}
           {activeTab === "dashboard" && (
             <>
@@ -1045,12 +1040,19 @@ export default function AdminDashboardNew() {
           )}
 
           {/* ════════════════════════════════════════
-              RATINGS TAB — UNTOUCHED
+              RATINGS TAB
+              key={ratingsKey}        → remounts component on every tab
+                                        click and on every socket event,
+                                        forcing a fresh data fetch
+              refreshTrigger={ratingsKey} → in case RatingsSection uses
+                                        a useEffect([refreshTrigger]) pattern
           ════════════════════════════════════════ */}
-          {activeTab === "ratings" && <RatingsSection />}
+          {activeTab === "ratings" && (
+            <RatingsSection key={ratingsKey} refreshTrigger={ratingsKey} />
+          )}
 
           {/* ════════════════════════════════════════
-              VOICE TAB — ALL 5 FIXES APPLIED HERE
+              VOICE TAB
           ════════════════════════════════════════ */}
           {activeTab === "voice" && (
             <>
@@ -1198,7 +1200,6 @@ export default function AdminDashboardNew() {
                                   </span>
                                 </div>
 
-                                {/* Spoken transcript */}
                                 <p
                                   className="text-sm font-medium"
                                   style={{ color: "#EAEAEA" }}
@@ -1208,7 +1209,6 @@ export default function AdminDashboardNew() {
                                     : "No transcript available"}
                                 </p>
 
-                                {/* FIX 3: requestedAt with createdAt fallback */}
                                 <div className="flex items-center gap-1 mt-1">
                                   <Clock
                                     className="w-3 h-3"
@@ -1233,7 +1233,6 @@ export default function AdminDashboardNew() {
 
                               {/* Right */}
                               <div className="flex flex-col items-end gap-2 shrink-0">
-                                {/* FIX 5: 3-state badge */}
                                 <span
                                   className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full"
                                   style={{
@@ -1245,7 +1244,6 @@ export default function AdminDashboardNew() {
                                   {req.status}
                                 </span>
 
-                                {/* FIX 4: "printed" + "rejected" buttons */}
                                 {isPending && (
                                   <div className="flex gap-2">
                                     <motion.button
@@ -1300,7 +1298,7 @@ export default function AdminDashboardNew() {
           )}
 
           {/* ════════════════════════════════════════
-              HISTORY TAB — UNTOUCHED
+              HISTORY TAB
           ════════════════════════════════════════ */}
           {activeTab === "history" && (
             <motion.div
