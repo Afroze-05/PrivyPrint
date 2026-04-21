@@ -1506,7 +1506,7 @@
 //     return null;
 //   }
 // }
-
+import { io } from "socket.io-client";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../services/api";
@@ -1837,20 +1837,23 @@ export default function AdminDashboard() {
   async function fetchChartData() {
     setChartsLoading(true);
     try {
-      const [statsRes, documentsRes, tokensRes, activityRes] = await Promise.all([
-        api.get("/stats"),
-        api.get("/documents"),
-        api.get("/tokens"),
-        api.get("/activity"),
-      ]);
+      const [statsRes, documentsRes, tokensRes, activityRes] =
+        await Promise.all([
+          api.get("/stats"),
+          api.get("/documents"),
+          api.get("/tokens"),
+          api.get("/activity"),
+        ]);
 
       // Use print data from stats API for print activity chart
       if (statsRes.data && statsRes.data.printsByDay) {
         const printData = statsRes.data.printsByDay;
-        setChartData(printData.map(item => ({
-          date: item.date,
-          count: item.count
-        })));
+        setChartData(
+          printData.map((item) => ({
+            date: item.date,
+            count: item.count,
+          })),
+        );
       } else {
         setChartData([]);
       }
@@ -1868,7 +1871,7 @@ export default function AdminDashboard() {
           .map(([date, count]) => ({ date, count }))
           .sort((a, b) => new Date(a.date) - new Date(b.date));
         // Store upload data separately if needed
-        console.log('Upload chart data:', uploadChartData);
+        console.log("Upload chart data:", uploadChartData);
       }
 
       if (tokensRes.data && Array.isArray(tokensRes.data)) {
@@ -2001,6 +2004,15 @@ export default function AdminDashboard() {
       clearInterval(ratingInterval);
       clearInterval(reviewInterval);
     };
+  }, []);
+
+  useEffect(() => {
+    const socket = io("http://localhost:5000");
+    socket.on("stats-updated", () => {
+      loadRealTimeStats();
+      loadEarningsHistory();
+    });
+    return () => socket.disconnect();
   }, []);
 
   async function fetchHistoryData() {
@@ -3374,7 +3386,7 @@ export default function AdminDashboard() {
                               ].map((h) => (
                                 <th
                                   key={h}
-                                  className={`${(h === "Copies" || h === "Pages") ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
+                                  className={`${h === "Copies" || h === "Pages" ? "text-center" : h === "Price" ? "text-right" : "text-left"} py-3 px-4 text-sm font-medium`}
                                   style={{ color: "#999999" }}
                                 >
                                   {h}

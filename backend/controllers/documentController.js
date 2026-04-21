@@ -598,7 +598,7 @@ async function verifyToken(req, res) {
       // Additional metadata for frontend
       fileUrl: doc.fileUrl,
       fileName: doc.fileUrl ? doc.fileUrl.split("/").pop() : "unknown",
-      fileSize: doc.fileUrl ? null : null, // Could be enhanced to store file size
+      fileSize: doc.fileUrl ? null : null,
       customerId: doc.userId?._id,
       customerEmail: doc.userId?.email,
       customerName: doc.userId?.name,
@@ -768,43 +768,45 @@ async function getDailyRevenue(req, res) {
   }
 }
 
-// Get real-time print statistics
+// ─────────────────────────────────────────────────────────────────
+// Get real-time print statistics — FIXED
+// Uses last 24 hours instead of calendar day to avoid IST/UTC
+// timezone mismatch where today's prints show as 0.
+// ─────────────────────────────────────────────────────────────────
 async function getRealTimeStats(req, res) {
   try {
     console.log("Fetching real-time print statistics...");
 
-    // Get all documents for comprehensive stats
-    const docs = (await Document.find({})) || [];
+    // Last 24 hours — timezone-safe, always catches today's prints
+    const last24hrs = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Initialize safe defaults
+    const docs =
+      (await Document.find({
+        status: "completed",
+        createdAt: { $gte: last24hrs },
+      })) || [];
+
     let totalPrints = 0;
     let bwPrints = 0;
     let colorPrints = 0;
     let totalEarnings = 0;
 
-    // Safe aggregation with null checks and consistent pricing
-    if (docs && Array.isArray(docs)) {
-      docs.forEach((doc) => {
-        if (!doc) return;
+    docs.forEach((doc) => {
+      const pages = doc.pages || 1;
+      const type = doc.type || "B/W";
+      const copies = doc.copies || 1;
+      const rate = type === "Color" ? 5 : 2;
+      const price = doc.price || pages * rate * copies;
 
-        const pages = doc.pages || 1;
-        const type = doc.printType || doc.type || "bw";
-        const copies = doc.copies || 1;
+      totalPrints += copies;
+      totalEarnings += price;
 
-        // Consistent pricing logic
-        const rate = type === "color" || type === "Color" ? 5 : 2;
-        const price = doc.price || pages * rate * copies;
-
-        totalPrints += copies;
-        totalEarnings += price;
-
-        if (type === "color" || type === "Color") {
-          colorPrints += copies;
-        } else {
-          bwPrints += copies;
-        }
-      });
-    }
+      if (type === "Color") {
+        colorPrints += copies;
+      } else {
+        bwPrints += copies;
+      }
+    });
 
     const stats = {
       totalPrints,
@@ -813,14 +815,10 @@ async function getRealTimeStats(req, res) {
       totalEarnings,
       currency: "₹",
       lastUpdated: new Date(),
-      breakdown: {
-        bwEarnings: bwPrints * 2,
-        colorEarnings: colorPrints * 5,
-      },
     };
 
     console.log(
-      `Real-time stats: ${totalPrints} prints, ₹${totalEarnings} earnings`,
+      `Real-time stats (last 24h): ${totalPrints} prints, ₹${totalEarnings} earnings`,
     );
     return res.status(200).json(stats);
   } catch (err) {
@@ -902,13 +900,11 @@ async function getEarningsHistory(req, res) {
 
     // Helper function to get earnings for a date range with safe aggregation
     function getEarningsForRange(startDate, endDate, documents) {
-      // Initialize safe defaults
       let totalEarnings = 0;
       let totalPrints = 0;
       let bwPrints = 0;
       let colorPrints = 0;
 
-      // Safe aggregation with null checks and consistent pricing
       if (documents && Array.isArray(documents)) {
         documents.forEach((doc) => {
           if (!doc) return;
@@ -919,7 +915,6 @@ async function getEarningsHistory(req, res) {
             const type = doc.printType || doc.type || "bw";
             const copies = doc.copies || 1;
 
-            // Consistent pricing logic
             const rate = type === "color" || type === "Color" ? 5 : 2;
             const price = doc.price || pages * rate * copies;
 

@@ -4,13 +4,13 @@ import { Send, MessageSquare, CheckCircle } from "lucide-react";
 import StarRating from "./StarRating";
 import { api } from "../services/api";
 
-export default function RatingSubmission({ 
-  jobId, 
-  onSuccess, 
+export default function RatingSubmission({
+  jobId,
+  onSuccess,
   onCancel,
   showFeedback = true,
   title = "Rate Your Experience",
-  subtitle = "How would you rate your printing experience?"
+  subtitle = "How would you rate your printing experience?",
 }) {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
@@ -20,7 +20,7 @@ export default function RatingSubmission({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (rating === 0) {
       setError("Please select a rating before submitting");
       return;
@@ -33,7 +33,7 @@ export default function RatingSubmission({
       const response = await api.post("/rate", {
         jobId,
         rating,
-        feedback: feedback.trim()
+        feedback: feedback.trim(),
       });
 
       if (response.status === 201) {
@@ -85,35 +85,33 @@ export default function RatingSubmission({
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
           className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-          style={{ 
-            background: "rgba(34, 197, 94, 0.15)", 
-            border: "2px solid rgba(34, 197, 94, 0.3)" 
+          style={{
+            background: "rgba(34, 197, 94, 0.15)",
+            border: "2px solid rgba(34, 197, 94, 0.3)",
           }}
         >
           <CheckCircle className="w-8 h-8" style={{ color: "#22c55e" }} />
         </motion.div>
-        
+
         <h3 className="text-xl font-bold text-white mb-2">
           Thank You for Your Rating!
         </h3>
-        
-        <p className="text-gray-400 mb-4">
-          {getRatingMessage(rating)}
-        </p>
-        
+
+        <p className="text-gray-400 mb-4">{getRatingMessage(rating)}</p>
+
         <div className="flex items-center justify-center gap-1 mb-4">
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
               key={star}
               className={`w-6 h-6 ${
-                star <= rating 
-                  ? 'text-yellow-400 fill-yellow-400' 
-                  : 'text-gray-600'
+                star <= rating
+                  ? "text-yellow-400 fill-yellow-400"
+                  : "text-gray-600"
               }`}
             />
           ))}
         </div>
-        
+
         <p className="text-sm text-gray-500">
           Your feedback helps us improve our printing service.
         </p>
@@ -127,26 +125,28 @@ export default function RatingSubmission({
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-md mx-auto"
     >
-      <div className="relative backdrop-blur-xl border rounded-2xl p-6"
+      <div
+        className="relative backdrop-blur-xl border rounded-2xl p-6"
         style={{
           background: "rgba(255,255,255,0.03)",
           backdropFilter: "blur(16px)",
           border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)"
+          boxShadow:
+            "0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,107,53,0.08)",
         }}
       >
-        <div className="absolute top-0 left-0 right-0 h-[1px]"
-          style={{ background: "linear-gradient(to right, #FF6B35, transparent)" }} />
-        
+        <div
+          className="absolute top-0 left-0 right-0 h-[1px]"
+          style={{
+            background: "linear-gradient(to right, #FF6B35, transparent)",
+          }}
+        />
+
         <div className="relative z-10">
           {/* Header */}
           <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-white mb-2">
-              {title}
-            </h3>
-            <p className="text-gray-400 text-sm">
-              {subtitle}
-            </p>
+            <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+            <p className="text-gray-400 text-sm">{subtitle}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -214,13 +214,13 @@ export default function RatingSubmission({
                   style={{
                     background: "rgba(255,255,255,0.05)",
                     border: "1px solid rgba(255,255,255,0.1)",
-                    color: "#999999"
+                    color: "#999999",
                   }}
                 >
                   Cancel
                 </motion.button>
               )}
-              
+
               <motion.button
                 type="submit"
                 disabled={isSubmitting || rating === 0}
@@ -228,24 +228,30 @@ export default function RatingSubmission({
                 whileTap={{ scale: rating > 0 && !isSubmitting ? 0.98 : 1 }}
                 className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
                   rating === 0 || isSubmitting
-                    ? 'opacity-50 cursor-not-allowed'
-                    : ''
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
                 }`}
                 style={{
-                  background: rating > 0 && !isSubmitting 
-                    ? "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)" 
-                    : "rgba(255,255,255,0.1)",
-                  border: rating > 0 && !isSubmitting 
-                    ? "none" 
-                    : "1px solid rgba(255,255,255,0.2)",
-                  color: rating > 0 && !isSubmitting ? "#FFFFFF" : "#999999"
+                  background:
+                    rating > 0 && !isSubmitting
+                      ? "linear-gradient(135deg, #FF6B35 0%, #FF8A50 100%)"
+                      : "rgba(255,255,255,0.1)",
+                  border:
+                    rating > 0 && !isSubmitting
+                      ? "none"
+                      : "1px solid rgba(255,255,255,0.2)",
+                  color: rating > 0 && !isSubmitting ? "#FFFFFF" : "#999999",
                 }}
               >
                 {isSubmitting ? (
                   <>
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                       className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                     />
                     Submitting...
