@@ -1,0 +1,506 @@
+/* RESPONSIVE FIXES - DO NOT MODIFY EXISTING STYLES */
+
+/* Large Desktop (1025px and above) - No changes needed */
+/* Desktop view remains exactly the same */
+
+/* ========================================
+   GLOBAL LAYOUT FIXES - ALL SCREENS
+   ======================================== */
+
+/* Ensure html, body allow scrolling and prevent horizontal overflow */
+html, body {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  min-height: 100vh !important;
+}
+
+#root {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  min-height: 100vh !important;
+}
+
+/* Fix PrivyPrint title clipping - ensure text is never cut off */
+h1, h2, h3, .text-5xl, .text-6xl, .text-7xl {
+  overflow: visible !important;
+  word-break: break-word !important;
+  white-space: normal !important;
+  max-width: 100% !important;
+}
+
+/* Images & Media - All screen sizes */
+img, canvas, video {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Small Desktop (769px - 1024px) */
+@media (max-width: 1024px) {
+  /* Ensure all containers use max-width: 100% */
+  .sp-container {
+    max-width: 100% !important;
+    padding: 0 16px !important;
+  }
+  
+  /* Flex wrap for content overflow */
+  .sp-row {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Chart containers */
+  .recharts-responsive-container {
+    width: 100% !important;
+    min-height: 350px !important;
+  }
+  
+  .chart-scroll-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Tables */
+  .sp-table {
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Grid adjustments */
+  .responsive-grid-fix {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+  }
+}
+
+/* Tablet (481px - 768px) */
+@media (max-width: 768px) {
+  /* Remove horizontal scrolling globally */
+  body {
+    overflow-x: hidden !important;
+  }
+  
+  /* Ensure vertical scrolling */
+  html, body, #root {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* All elements respect container width */
+  * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Container adjustments */
+  .sp-container {
+    max-width: 100% !important;
+    padding: 0 12px !important;
+  }
+  
+  .sp-page {
+    padding: 20px 12px 32px !important;
+  }
+  
+  /* Convert horizontal layouts to vertical */
+  .sp-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  
+  /* Grid becomes single column */
+  .sp-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  .responsive-grid-fix {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  /* Charts - wrap in scroll container */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 250px !important;
+  }
+  
+  .recharts-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+  }
+  
+  .chart-scroll-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    padding-bottom: 10px !important;
+  }
+  
+  /* Tables - horizontal scroll */
+  .sp-table {
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+  }
+  
+  .table-scroll-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+  }
+  
+  /* Cards stack vertically */
+  .sp-card {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+  
+  .card-stack-mobile {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  
+  /* Navigation - prevent overflow */
+  nav, .navbar, .nav {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  
+  .nav-mobile-fix {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  
+  /* Sidebar mobile fixes */
+  .sidebar-mobile-fix {
+    position: fixed !important;
+    z-index: 999 !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Main content adjustments */
+  .main-content-mobile {
+    margin-left: 0 !important;
+    padding: 16px !important;
+  }
+  
+  /* Forms */
+  .form-mobile-fix {
+    width: 100% !important;
+    padding: 16px !important;
+  }
+  
+  .sp-input, .sp-select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Buttons */
+  .button-mobile-fix {
+    width: 100% !important;
+    min-height: 44px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .sp-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+  
+  /* Popups */
+  .sp-popup {
+    padding: 12px !important;
+  }
+  
+  .sp-popup-inner {
+    width: 100% !important;
+    max-width: 500px !important;
+  }
+  
+  /* Fix any overflow issues */
+  .landing-page-container {
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+  
+  .min-h-screen-fix {
+    min-height: 100vh !important;
+    height: auto !important;
+  }
+  
+  /* Flex utilities */
+  .flex-wrap-mobile {
+    flex-wrap: wrap !important;
+  }
+  
+  .flex-direction-mobile {
+    flex-direction: column !important;
+  }
+  
+  .full-width-mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Mobile (480px and below) */
+@media (max-width: 480px) {
+  /* Tighter spacing */
+  .sp-page {
+    padding: 16px 8px 24px !important;
+  }
+  
+  .sp-container {
+    padding: 0 8px !important;
+  }
+  
+  .sp-card {
+    padding: 16px !important;
+  }
+  
+  /* Smaller touch targets */
+  .sp-btn {
+    padding: 14px 16px !important;
+    min-height: 48px !important;
+  }
+  
+  .sp-input, .sp-select {
+    padding: 14px 12px !important;
+  }
+  
+  /* Charts smaller minimum height */
+  .recharts-responsive-container {
+    min-height: 200px !important;
+  }
+  
+  /* Tables - ensure scrollability */
+  .sp-table {
+    font-size: 14px !important;
+  }
+  
+  .sp-table th,
+  .sp-table td {
+    padding: 8px !important;
+  }
+  
+  /* Popups full width on small screens */
+  .sp-popup {
+    padding: 8px !important;
+  }
+  
+  .sp-popup-inner {
+    width: 100% !important;
+    padding: 16px !important;
+  }
+  
+  /* Badges adjust */
+  .sp-badge {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  /* Login page specific fixes */
+  .min-h-screen.bg-black {
+    min-height: 100vh !important;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+  
+  .grid.grid-cols-1.lg\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+  
+  .max-w-6xl.mx-auto.px-6 {
+    padding: 0 12px !important;
+  }
+  
+  .min-h-\[90vh\] {
+    min-height: auto !important;
+    height: auto !important;
+  }
+  
+  /* Form containers */
+  .max-w-md {
+    max-width: 100% !important;
+    margin: 0 8px !important;
+  }
+}
+
+/* ========================================
+   COMPREHENSIVE TABLE & CHART FIXES
+   ======================================== */
+
+/* Tables - All screen sizes */
+.sp-table, table {
+  display: block !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+/* Table wrappers */
+.table-scroll-wrapper, .table-container {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Chart containers - All screen sizes */
+.recharts-responsive-container,
+.recharts-wrapper,
+.chart-scroll-container,
+.chart-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Images & Media - All screen sizes */
+img, canvas, video {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Ensure scrolling works on all devices */
+html, body {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+#root {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+/* Fix any potential overflow issues */
+* {
+  box-sizing: border-box !important;
+}
+
+/* ========================================
+   SPECIFIC ISSUE FIXES
+   ======================================== */
+
+/* ISSUE 1: HOME PAGE NOT SCROLLING FIX */
+@media (max-width: 768px) {
+  /* Force scrolling on home page */
+  body, html {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Fix main containers that might block scrolling */
+  .main-container, 
+  .page-container,
+  .landing-page-container,
+  .home-container,
+  .relative.w-screen.h-screen {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Remove any fixed height that prevents scrolling */
+  [style*="height: 100vh"] {
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+  
+  [style*="overflow: hidden"] {
+    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Ensure home page grid allows scrolling */
+  .grid.grid-rows-\[1fr_auto\] {
+    min-height: auto !important;
+    height: auto !important;
+  }
+}
+
+/* ISSUE 2: ADMIN DASHBOARD CUT FIX */
+@media (max-width: 768px) {
+  /* Allow dashboard layout to stack vertically */
+  .dashboard-container,
+  .admin-dashboard,
+  .dashboard-layout,
+  .relative.min-h-screen {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  
+  /* Sidebar becomes full width on top or collapsible */
+  .sidebar,
+  .admin-sidebar,
+  .dashboard-sidebar,
+  .fixed.left-0.top-0.h-full.w-64 {
+    width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    z-index: 10 !important;
+  }
+  
+  /* Main content full width below sidebar */
+  .dashboard-content,
+  .admin-content,
+  .main-content,
+  .ml-64.p-8 {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding: 16px !important;
+  }
+  
+  /* Fix cards and charts overflow */
+  .card,
+  .chart-container,
+  .dashboard-card,
+  .admin-card,
+  .backdrop-blur-xl.border {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Ensure dashboard grid stacks */
+  .dashboard-grid,
+  .admin-grid,
+  .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-4 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    width: 100% !important;
+  }
+  
+  /* Charts grid - single column on mobile */
+  .grid.grid-cols-1.lg\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Chart containers - ensure scrollability */
+  .recharts-responsive-container,
+  .w-full.h-\[300px\] {
+    width: 100% !important;
+    min-height: 250px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}

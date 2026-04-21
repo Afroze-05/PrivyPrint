@@ -2,6 +2,7 @@
 @import url('https://fonts.cdnfonts.com/css/clash-display');
 @import url('https://fonts.cdnfonts.com/css/satoshi');
 @import "tailwindcss";
+@import "./responsive.css";
 
 :root {
   --primary: #1565C0;
