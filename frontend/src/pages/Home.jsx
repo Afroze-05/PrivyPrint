@@ -595,4 +595,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
+} //home page
