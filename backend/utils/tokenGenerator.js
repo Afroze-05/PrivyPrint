@@ -6,7 +6,7 @@
  */
 function generateToken() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let token = "SPX-";
+  let token = "PPX-";
   for (let i = 0; i < 5; i++) {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
   }

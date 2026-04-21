@@ -1,5 +1,5 @@
 const path = require("path");
-const express = require("express");
+const express = require("express"); //created a basic server
 const cors = require("cors");
 require("dotenv").config();
 
@@ -12,28 +12,29 @@ const statsRoutes = require("./routes/statsRoutes");
 const logsRoutes = require("./routes/logsRoutes");
 const testRoutes = require("./routes/testRoutes");
 const testTokenRoutes = require("./routes/testTokenRoutes");
-// const debugRoutes = require("./routes/debugRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const printRoutes = require("./routes/printRoute");
 
-const app = express();
+const app = express(); //actually creating the server instance
 
 app.use(
+  //.use() is a middleware function that adds functionality to the Express app. In this case, it's adding CORS (Cross-Origin Resource Sharing) support to the server. CORS is a security feature implemented by web browsers that restricts web pages from making requests to a different domain than the one that served the web page. By using the cors middleware, you can specify which domains are allowed to access your server's resources, as well as other options like allowed headers and methods.
   cors({
     origin: [
+      //origin specifies which domains are allowed to access the server's resources. In this case, it's allowing requests from localhost on ports 5173, 5174, and 5175, which are commonly used for development servers.
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:5175",
       "https://privyprint-frontend.onrender.com" // ✅ ADD THIS
     ],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true, //ye allow karega ki client side se cookies aur authentication headers bheje ja sake, jo ki zaruri hai agar aapka server authentication ya session management use karta hai.
+    allowedHeaders: ["Content-Type", "Authorization"], //json data aur authentication tokens ko bhejne ke liye zaruri headers ko specify karta hai. Content-Type header batata hai ki request body ka format kya hai (e.g., application/json), aur Authorization header authentication credentials ko carry karta hai (e.g., Bearer tokens).
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "2mb" })); //it allows the server to incoming JSON requests and limits the size of the request body to 2 megabytes. This is a security measure to prevent abuse by limiting the amount of data that can be sent in a single request.
+app.use(express.urlencoded({ extended: true })); //when we fill a form its url will be enncoded with data ,ye form ke data ko read karta hain , it converts fom data into json format and extended means it will hadle complex data
 
 app.use(
   "/uploads",
@@ -53,27 +54,23 @@ app.use(
   express.static(path.join(__dirname, "uploads")),
 );
 
-app.get("/", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
 app.post("/api/direct-test", (req, res) => {
-  console.log("🔧 direct-test route called");
+  console.log(" direct-test route called");
   res.json({ message: "Direct test works" });
 });
 
 app.post("/api/test-route", (req, res) => {
-  console.log("🔧 test-route called");
+  console.log("test-route called");
   res.json({ message: "API working" });
 });
 
 app.get("/api/rate-test", (req, res) => {
-  console.log("🔧 rate-test route called");
-  console.log("🔧 rate-test query:", req.query);
+  console.log("rate-test route called");
+  console.log(" rate-test query:", req.query);
   res.json({ message: "Rate test working", query: req.query });
 });
 
-console.log("🔧 Registering routes...");
+console.log("Registering routes...");
 try {
   app.use("/api/auth", authRoutes);
   app.use("/api", documentRoutes);
@@ -85,10 +82,10 @@ try {
   // app.use("/api/debug", debugRoutes);
   app.use("/api", adminRoutes);
   app.use("/api/rate", ratingRoutes);
-  app.use("/api", printRoutes); // ✅ voice print — single registration here
-  console.log("🔧 All routes registered");
+  app.use("/api", printRoutes); //  voice print — single registration here
+  console.log(" All routes registered");
 } catch (error) {
-  console.error("❌ Error loading routes:", error);
+  console.error("Error loading routes:", error);
 }
 
 app.use((req, res) => {
@@ -108,7 +105,8 @@ const PORT = process.env.PORT || 5000;
 
 (async () => {
   await connectDB();
+  //what to do after connecting to the database
   app.listen(PORT, () => {
-    console.log(`SecurePrint backend listening on port ${PORT}`);
+    console.log(`PrivyPrint backend listening on port ${PORT}`);
   });
 })();

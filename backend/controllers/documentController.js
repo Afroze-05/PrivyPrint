@@ -8,6 +8,7 @@ const {
 } = require("../utils/emailTemplates");
 
 const DOCUMENT_TYPE_NORMALIZATION = {
+  //Converting different inputs into standard format
   bw: "B/W",
   "b/w": "B/W",
   b_w: "B/W",
@@ -19,7 +20,7 @@ async function generateUniqueDocumentToken() {
   for (let attempt = 0; attempt < 10; attempt++) {
     const token = generateToken();
     console.log(` Token generation attempt ${attempt + 1}: ${token}`);
-    const exists = await Document.exists({ token });
+    const exists = await Document.exists({ token }); //Check if already exists
     if (!exists) {
       console.log(` Unique token generated: ${token}`);
       return token;
@@ -40,7 +41,7 @@ async function markExpiredIfNeeded(doc) {
 }
 
 async function getDocumentForVerification(token) {
-  const searchToken = token ? token.toUpperCase().trim() : token;
+  const searchToken = token ? token.toUpperCase().trim() : token; //Avoid case issues:"abc123" = "ABC123"
   console.log(` Searching token in Documents collection: "${searchToken}"`);
   console.log(`Original token: "${token}"`);
   console.log(`Processed token: "${searchToken}"`);
@@ -48,7 +49,7 @@ async function getDocumentForVerification(token) {
 
   // Case-insensitive token search - convert to uppercase for matching
   const doc = await Document.findOne({
-    token: { $regex: new RegExp(`^${searchToken}$`, "i") },
+    token: { $regex: new RegExp(`^${searchToken}$`, "i") }, //$regex is a MongoDB operator “Match using a pattern instead of exact value”//"i" = case-insensitive
   }).populate("userId", "email name role");
 
   console.log(`MongoDB query executed...`);
@@ -125,16 +126,14 @@ async function uploadDocument(req, res) {
         ? req.files
         : req.file
           ? [req.file]
-          : [];
+          : []; //if files exist, use them; else if single file exists, wrap it in array; else empty array
 
     if (!filesToProcess || filesToProcess.length === 0) {
       console.log("Upload Debug - Missing file upload");
-      return res
-        .status(400)
-        .json({
-          message:
-            "Missing file upload. Use field name `files` for multiple files or `file` for single file.",
-        });
+      return res.status(400).json({
+        message:
+          "Missing file upload. Use field name `files` for multiple files or `file` for single file.",
+      });
     }
 
     console.log(" Upload Debug - Processing", filesToProcess.length, "files");
@@ -339,13 +338,13 @@ async function sendPrintSuccessEmail(document) {
 
     await sendEmail({
       email: document.userId?.email,
-      subject: `🖨️ Your PrivyPrint job is complete - Rate your experience!`,
+      subject: `Your PrivyPrint job is complete -> Rate your experience!`,
       message: emailHtml,
       textMessage: `Your print job "${filename}" has been completed. Please rate your experience: ${ratingUrl}`,
     });
 
     console.log(
-      `📧 Rating email sent to ${document.userId?.email} for job ${document.token}`,
+      `Print success email sent to ${document.userId?.email} for job ${document.token}`,
     );
     return true;
   } catch (error) {
@@ -354,10 +353,10 @@ async function sendPrintSuccessEmail(document) {
     return false;
   }
 }
-
+//now api function that will be called when the admin tries to print with the token
 async function simulatePrint(req, res) {
   try {
-    const { token } = req.params;
+    const { token } = req.params; //getting token from url
     const adminId = req.user.id;
     const now = new Date();
 
@@ -371,7 +370,7 @@ async function simulatePrint(req, res) {
         status: "waiting",
         expiresAt: { $gt: now },
       },
-      { $set: { status: "printing" } },
+      { $set: { status: "printing" } }, //updated doc status to priting
       { new: true },
     );
 
@@ -408,11 +407,11 @@ async function simulatePrint(req, res) {
     const completedDoc = await Document.findOneAndUpdate(
       {
         token: { $regex: new RegExp(`^${searchToken}$`, "i") },
-        status: "printing",
+        status: "printing", //only update if status is still printing (safety check)
       },
       { $set: { status: "completed" } },
       { new: true },
-    ).populate("userId", "name email");
+    ).populate("userId", "name email"); //fetch user details for email after print completion
 
     if (!completedDoc) {
       return res
@@ -571,7 +570,7 @@ async function verifyToken(req, res) {
 
     const doc = result.document;
 
-    // ⏱️ CHECK 2 MINUTE EXPIRY (additional safety check)
+    // ⏱ CHECK 2 MINUTE EXPIRY (additional safety check)
     const now = new Date();
     const diff = (now - new Date(doc.createdAt)) / 1000; // seconds
 
@@ -621,8 +620,8 @@ async function getPrintHistory(req, res) {
     console.log("Fetching print history...");
 
     // Get all documents for comprehensive history
-    const docs = await Document.find({})
-      .select("fileUrl type copies pages createdAt userId")
+    const docs = await Document.find({}) //get all docs here {} empty means no filter
+      .select("fileUrl type copies pages createdAt userId") //only return the fiels mentioned
       .populate("userId", "name email")
       .sort({ createdAt: -1 })
       .lean();
@@ -762,12 +761,10 @@ async function getDailyRevenue(req, res) {
     return res.status(200).json(revenueData);
   } catch (err) {
     console.error(" Failed to calculate daily revenue:", err);
-    return res
-      .status(500)
-      .json({
-        message: "Failed to calculate daily revenue.",
-        error: err.message,
-      });
+    return res.status(500).json({
+      message: "Failed to calculate daily revenue.",
+      error: err.message,
+    });
   }
 }
 
@@ -828,12 +825,10 @@ async function getRealTimeStats(req, res) {
     return res.status(200).json(stats);
   } catch (err) {
     console.error(" Failed to fetch real-time stats:", err);
-    return res
-      .status(500)
-      .json({
-        message: "Failed to fetch real-time stats.",
-        error: err.message,
-      });
+    return res.status(500).json({
+      message: "Failed to fetch real-time stats.",
+      error: err.message,
+    });
   }
 }
 
@@ -975,12 +970,10 @@ async function getEarningsHistory(req, res) {
     return res.status(200).json(history);
   } catch (err) {
     console.error(" Failed to fetch earnings history:", err);
-    return res
-      .status(500)
-      .json({
-        message: "Failed to fetch earnings history.",
-        error: err.message,
-      });
+    return res.status(500).json({
+      message: "Failed to fetch earnings history.",
+      error: err.message,
+    });
   }
 }
 

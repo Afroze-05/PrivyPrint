@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const rateLimit = require("express-rate-limit");
 
 // Bypass rate limiting temporarily as requested
 const skipLimiter = (req, res, next) => next();
@@ -17,3 +17,5 @@ module.exports = {
   authLimiter,
   emailLimiter,
 };
+//limits how many requests a user can make to the API in a given time frame, helping to prevent abuse and ensure fair usage.
+//max 100 request per 15 minutes for general API endpoints, 20 requests per 15 minutes for authentication endpoints, and 5 requests per hour for email-related endpoints.

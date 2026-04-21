@@ -1,18 +1,20 @@
 const path = require("path");
 const multer = require("multer");
 
-const uploadsDir = path.join(__dirname, "..", "uploads");
-
+const uploadsDir = path.join(__dirname, "..", "uploads"); //_dirname gives the directory of the current file, and path.join constructs a path to the uploads directory one level up from the current directory.
+//eg /project/uploads
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const base = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, "_");
+    const ext = path.extname(file.originalname).toLowerCase(); //extension of the original file name, converted to lowercase for consistency.
+    const base = path
+      .basename(file.originalname, ext)
+      .replace(/[^a-z0-9_-]/gi, "_"); //Removes special characters ex my photo@123.jpg → my_photo_123
     const unique = Math.random().toString(36).slice(2, 9).toUpperCase();
     cb(null, `${Date.now()}-${unique}-${base}${ext}`);
   },
 });
-
+//Save all uploaded files inside /uploads folder with a unique name format: timestamp-randomstring-originalname.ext
 const fileFilter = (_req, file, cb) => {
   const mimetype = file.mimetype;
   const isPdf = mimetype === "application/pdf";
@@ -33,12 +35,11 @@ const upload = multer({
 // Handles multiple files field named `files`.
 const uploadMultiple = multer({
   storage,
-  limits: { 
+  limits: {
     fileSize: 15 * 1024 * 1024, // 15MB per file
-    files: 10 // Maximum 10 files at once
+    files: 10, // Maximum 10 files at once
   },
   fileFilter,
 });
 
 module.exports = { upload, uploadMultiple };
-

@@ -3,7 +3,7 @@ const Document = require("../models/Document");
 
 async function getPrintLogs(_req, res) {
   try {
-    const logs = await Log.find({}).sort({ time: -1 }).lean();
+    const logs = await Log.find({}).sort({ time: -1 }).lean(); //fetching all logs and sorting them by time in descending order
     const tokens = logs.map((l) => l.token);
     if (tokens.length === 0) {
       return res.status(200).json({ logs: [] });
@@ -28,9 +28,10 @@ async function getPrintLogs(_req, res) {
 
     return res.status(200).json({ logs: merged });
   } catch (err) {
-    return res.status(500).json({ message: "Failed to fetch print logs.", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch print logs.", error: err.message });
   }
 }
 
 module.exports = { getPrintLogs };
-

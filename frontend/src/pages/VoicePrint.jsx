@@ -63,10 +63,10 @@ const VoicePrint = () => {
       setMessage("Could not reach print server. Is the backend running?");
     }
   }, []);
-
+  //voice Recognisition API setup and event handlers
   useEffect(() => {
     const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+      window.SpeechRecognition || window.webkitSpeechRecognition; //webkit is for chrome / safari
 
     if (!SpeechRecognition) {
       setStatus("error");
@@ -75,13 +75,13 @@ const VoicePrint = () => {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = false; //no continuos listening
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript;
-      setTranscript(text); // ✅ shows on screen immediately
+      setTranscript(text); //  shows on screen immediately
       handleVoiceCommand(text);
     };
 
