@@ -1,6 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllTokens } from "../services/tokenStorage";
+import { initializeSocket, getSocket, socketListeners, isConnected, disconnectSocket } from "../services/socket";
+import api from "../services/api";
+
+// Add CSS animation for slide-in effect
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+`;
+document.head.appendChild(style);
 import { 
   LayoutDashboard, 
   Upload, 
@@ -17,7 +35,11 @@ import {
   X,
   Download,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Wifi,
+  WifiOff,
+  Mail,
+  Monitor
 } from "lucide-react";
 
 export default function CustomerDashboard() {
@@ -25,10 +47,11 @@ export default function CustomerDashboard() {
   const [activePage, setActivePage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  // Real-time state
   const [stats, setStats] = useState({
-    total: 24,
-    pending: 3,
-    completed: 21
+    total: 0,
+    pending: 0,
+    completed: 0
   });
 
   const [liveStatus, setLiveStatus] = useState({
@@ -36,37 +59,462 @@ export default function CustomerDashboard() {
     status: "Waiting"
   });
 
-  const [history] = useState([
-    { id: 1, file: "document.pdf", date: "2024-04-08", status: "completed" },
-    { id: 2, file: "presentation.pptx", date: "2024-04-07", status: "pending" },
-    { id: 3, file: "notes.docx", date: "2024-04-06", status: "completed" }
-  ]);
+  const [history, setHistory] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [userProfile, setUserProfile] = useState(null);
+  const [walletData, setWalletData] = useState({
+    balance: 250,
+    monthlySpending: 0
+  });
+
+  // Login session state
+  const [loginSession, setLoginSession] = useState({
+    lastLogin: null,
+    currentStatus: 'offline',
+    deviceInfo: {
+      browser: 'Unknown',
+      os: 'Unknown',
+      deviceType: 'Unknown'
+    },
+    location: {
+      ip: 'Unknown',
+      country: 'Unknown'
+    },
+    sessionStatus: 'inactive'
+  });
 
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "upload", label: "Upload Print", icon: Upload },
-    { id: "history", label: "History", icon: History },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "wallet", label: "Wallet", icon: Wallet },
-    { id: "profile", label: "Profile", icon: User }
+    { id: "history", label: "History", icon: History }
   ];
 
 
-  // Update live status from shared token storage
+  // Initialize Socket.io and fetch initial data
   useEffect(() => {
-    const allTokens = getAllTokens();
-    if (allTokens.length > 0) {
-      // Get the most recent token
-      const latestToken = allTokens[allTokens.length - 1];
-      setLiveStatus({
-        token: latestToken.token,
-        status: latestToken.status === 'completed' ? 'Printed' : 
-                latestToken.status === 'waiting' ? 'Waiting' : 
-                latestToken.status === 'printing' ? 'Printing' :
-                latestToken.status
-      });
+    const socket = initializeSocket();
+    if (socket) {
+      setConnectionStatus('connected');
     }
+
+    // Fetch initial data
+    fetchUserData();
+    fetchDocumentHistory();
+
+    // Set up Socket.io event listeners
+    setupSocketListeners();
+
+    // Cleanup on unmount
+    return () => {
+      if (socket) {
+        disconnectSocket();
+      }
+    };
   }, []);
+
+  // Monitor connection status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setConnectionStatus(isConnected() ? 'connected' : 'disconnected');
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch user profile and stats
+  const fetchUserData = async () => {
+    try {
+      const response = await api.get('/auth/verify-token');
+      setUserProfile(response.data.user);
+      
+      // Fetch document history to calculate stats
+      const historyResponse = await api.get('/documents/user/history');
+      const documents = historyResponse.data.documents || [];
+      
+      // Calculate stats from real data
+      const calculatedStats = {
+        total: documents.length,
+        pending: documents.filter(doc => doc.status === 'waiting').length,
+        completed: documents.filter(doc => doc.status === 'completed').length
+      };
+      setStats(calculatedStats);
+      
+      // Calculate monthly spending
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthlySpending = documents
+        .filter(doc => {
+          const docDate = new Date(doc.createdAt);
+          return doc.status === 'completed' && 
+                 docDate.getMonth() === currentMonth && 
+                 docDate.getFullYear() === currentYear;
+        })
+        .reduce((total, doc) => total + (doc.price || 0), 0);
+      
+      setWalletData(prev => ({ ...prev, monthlySpending }));
+      
+      // Update live status with most recent document
+      if (documents.length > 0) {
+        const latestDoc = documents[documents.length - 1];
+        setLiveStatus({
+          token: latestDoc.token,
+          status: latestDoc.status === 'completed' ? 'Printed' : 
+                  latestDoc.status === 'waiting' ? 'Waiting' : 
+                  latestDoc.status === 'printing' ? 'Printing' :
+                  latestDoc.status
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  // Fetch document history
+  const fetchDocumentHistory = async () => {
+    try {
+      const response = await api.get('/documents/user/history');
+      const documents = response.data.documents || [];
+      
+      // Transform data for display
+      const formattedHistory = documents.map(doc => ({
+        id: doc._id,
+        file: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'Unknown',
+        date: new Date(doc.createdAt).toLocaleDateString(),
+        type: doc.type || 'B/W',
+        copies: doc.copies || 1,
+        price: doc.price || 0,
+        status: doc.status
+      }));
+      
+      setHistory(formattedHistory);
+    } catch (error) {
+      console.error('Error fetching document history:', error);
+    }
+  };
+
+  // Set up Socket.io event listeners
+  const setupSocketListeners = () => {
+    // Listen for document creation
+    socketListeners.onDocumentCreated((data) => {
+      console.log('Document created:', data);
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        pending: prev.pending + 1
+      }));
+      
+      // Update live status
+      setLiveStatus({
+        token: data.token,
+        status: 'Waiting'
+      });
+      
+      // Add to history
+      const newHistoryItems = data.files.map(file => ({
+        id: file.id,
+        file: file.filename,
+        date: new Date(file.createdAt).toLocaleDateString(),
+        type: file.type,
+        copies: file.copies,
+        price: file.price,
+        status: 'waiting'
+      }));
+      
+      setHistory(prev => [...newHistoryItems, ...prev].slice(0, 10));
+      
+      // Add notification
+      addNotification({
+        type: 'success',
+        title: 'Document Uploaded',
+        message: `${data.totalFiles} file(s) uploaded successfully with token ${data.token}`,
+        time: new Date()
+      });
+    });
+
+    // Listen for document printing
+    socketListeners.onDocumentPrinting((data) => {
+      console.log('Document printing:', data);
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        pending: prev.pending - 1
+      }));
+      
+      // Update live status
+      setLiveStatus({
+        token: data.token,
+        status: 'Printing'
+      });
+      
+      // Update history
+      setHistory(prev => prev.map(item => 
+        item.file === data.filename 
+          ? { ...item, status: 'printing' }
+          : item
+      ));
+      
+      // Add notification
+      addNotification({
+        type: 'info',
+        title: 'Print Started',
+        message: `Your document "${data.filename}" is now being printed`,
+        time: new Date()
+      });
+    });
+
+    // Listen for document completion
+    socketListeners.onDocumentCompleted((data) => {
+      console.log('Document completed:', data);
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        completed: prev.completed + 1
+      }));
+      
+      // Update live status
+      setLiveStatus({
+        token: data.token,
+        status: 'Printed'
+      });
+      
+      // Update history
+      setHistory(prev => prev.map(item => 
+        item.file === data.filename 
+          ? { ...item, status: 'completed' }
+          : item
+      ));
+      
+      // Update wallet spending
+      setWalletData(prev => ({
+        ...prev,
+        monthlySpending: prev.monthlySpending + (data.price || 0)
+      }));
+      
+      // Add notification
+      addNotification({
+        type: 'success',
+        title: 'Print Completed',
+        message: `Your document "${data.filename}" is ready for pickup`,
+        time: new Date()
+      });
+    });
+
+    // Listen for user data updates
+    socketListeners.onUserDataUpdated((data) => {
+      console.log('User data updated:', data);
+      
+      // Refresh user profile data
+      fetchUserData();
+      
+      // Add notification for profile update
+      addNotification({
+        type: 'info',
+        title: 'Profile Updated',
+        message: 'Your profile information has been updated',
+        time: new Date()
+      });
+    });
+
+    // Listen for profile updates
+    socketListeners.onProfileUpdated((data) => {
+      console.log('Profile updated:', data);
+      
+      // Update user profile state
+      if (data.user) {
+        setUserProfile(prev => ({ ...prev, ...data.user }));
+      }
+      
+      // Add notification
+      addNotification({
+        type: 'success',
+        title: 'Profile Updated',
+        message: 'Your profile has been successfully updated',
+        time: new Date()
+      });
+    });
+
+    // Listen for profile update events
+    socketListeners.onProfileUpdate((data) => {
+      console.log('Profile update event received:', data);
+      
+      // Update user profile state with new data
+      if (data.user) {
+        setUserProfile(prev => ({ ...prev, ...data.user }));
+      }
+      
+      // Add notification for profile update
+      addNotification({
+        type: 'success',
+        title: 'Profile Updated',
+        message: 'Your profile has been updated in real-time',
+        time: new Date()
+      });
+    });
+
+    // Listen for history updates
+    socketListeners.onHistoryUpdated((data) => {
+      console.log('History updated:', data);
+      
+      // Refresh document history
+      fetchDocumentHistory();
+      
+      // Update stats if provided
+      if (data.stats) {
+        setStats(prev => ({ ...prev, ...data.stats }));
+      }
+    });
+
+    // Listen for new notifications
+    socketListeners.onNotificationReceived((data) => {
+      console.log('New notification:', data);
+      
+      // Add notification to state
+      addNotification({
+        type: data.type || 'info',
+        title: data.title || 'New Notification',
+        message: data.message || 'You have a new notification',
+        time: new Date(data.timestamp || Date.now())
+      });
+    });
+
+    // Listen for stats updates
+    socketListeners.onStatsUpdated((data) => {
+      console.log('Stats updated:', data);
+      
+      // Update stats
+      if (data.stats) {
+        setStats(prev => ({ ...prev, ...data.stats }));
+      }
+    });
+
+    // Listen for wallet updates
+    socketListeners.onWalletUpdated((data) => {
+      console.log('Wallet updated:', data);
+      
+      // Update wallet data
+      if (data.walletData) {
+        setWalletData(prev => ({ ...prev, ...data.walletData }));
+      }
+      
+      // Add notification for wallet update
+      addNotification({
+        type: 'info',
+        title: 'Wallet Updated',
+        message: data.message || 'Your wallet information has been updated',
+        time: new Date()
+      });
+    });
+
+    // Listen for login success events
+    socketListeners.onLoginSuccess((data) => {
+      console.log('Login success event received:', data);
+      
+      // Update login session state
+      if (data.session) {
+        setLoginSession(prev => ({
+          ...prev,
+          lastLogin: data.session.loginTime,
+          currentStatus: 'online',
+          deviceInfo: data.session.device,
+          location: {
+            ip: data.session.ip,
+            country: 'Unknown' // Could be enhanced with IP geolocation
+          },
+          sessionStatus: 'active'
+        }));
+      }
+      
+      // Update user profile with online status
+      if (data.user) {
+        setUserProfile(prev => ({ ...prev, ...data.user }));
+      }
+      
+      // Add notification for login success
+      addNotification({
+        type: 'success',
+        title: 'Login Successful',
+        message: `Logged in from ${data.session?.device?.deviceType || 'Unknown device'}`,
+        time: new Date()
+      });
+    });
+
+    // Listen for session update events
+    socketListeners.onSessionUpdate((data) => {
+      console.log('Session update event received:', data);
+      
+      // Update login session state
+      setLoginSession(prev => ({
+        ...prev,
+        sessionStatus: data.status,
+        lastActivity: data.lastActivity || new Date()
+      }));
+      
+      // Add notification for session update
+      addNotification({
+        type: 'info',
+        title: 'Session Updated',
+        message: `Session status: ${data.status}`,
+        time: new Date()
+      });
+    });
+
+    // Listen for logout events
+    socketListeners.onLogoutEvent((data) => {
+      console.log('Logout event received:', data);
+      
+      // Update login session state
+      setLoginSession(prev => ({
+        ...prev,
+        currentStatus: 'offline',
+        sessionStatus: 'inactive'
+      }));
+      
+      // Update user profile with offline status
+      if (data.user) {
+        setUserProfile(prev => ({ ...prev, ...data.user }));
+      }
+      
+      // Add notification for logout
+      addNotification({
+        type: 'info',
+        title: 'Logged Out',
+        message: 'You have been logged out successfully',
+        time: new Date()
+      });
+    });
+  };
+
+  // Add notification
+  const addNotification = (notification) => {
+    const newNotification = {
+      id: Date.now(),
+      ...notification,
+      read: false
+    };
+    
+    setNotifications(prev => [newNotification, ...prev].slice(0, 20));
+    setNotificationCount(prev => prev + 1);
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = (id) => {
+    setNotifications(prev => prev.map(notif => 
+      notif.id === id ? { ...notif, read: true } : notif
+    ));
+    setNotificationCount(prev => Math.max(0, prev - 1));
+  };
+
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+    setNotificationCount(0);
+  };
 
 
   const handleLogout = () => {
@@ -101,6 +549,7 @@ export default function CustomerDashboard() {
         <nav className="p-4">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
+            
             return (
               <button
                 key={item.id}
@@ -149,20 +598,34 @@ export default function CustomerDashboard() {
       <div className="flex-1 lg:ml-0">
         {/* Header */}
         <header className="bg-[#1a1a1a] border-b border-gray-800">
-          <div className="px-8 py-6">
+          <div className="px-8 py-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">
               {sidebarItems.find(item => item.id === activePage)?.label}
             </h2>
+            <div className="flex items-center gap-4">
+              {/* Connection Status */}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#0f0f0f] border border-gray-800">
+                {connectionStatus === 'connected' ? (
+                  <>
+                    <Wifi className="w-4 h-4 text-green-500" />
+                    <span className="text-xs text-green-500 font-medium">Live</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-4 h-4 text-gray-500" />
+                    <span className="text-xs text-gray-500 font-medium">Offline</span>
+                  </>
+                )}
+              </div>
+              
+                          </div>
           </div>
         </header>
 
         {/* Content Area */}
         <div className="p-8">
-          {activePage === "dashboard" && <DashboardHome stats={stats} liveStatus={liveStatus} history={history} navigate={navigate} />}
-                    {activePage === "history" && <HistoryPage history={history} />}
-          {activePage === "notifications" && <NotificationsPage />}
-          {activePage === "wallet" && <WalletPage />}
-          {activePage === "profile" && <ProfilePage />}
+          {activePage === "dashboard" && <DashboardHome stats={stats} liveStatus={liveStatus} history={history} navigate={navigate} userProfile={userProfile} loginSession={loginSession} />}
+          {activePage === "history" && <HistoryPage history={history} />}
         </div>
       </div>
     </div>
@@ -170,135 +633,102 @@ export default function CustomerDashboard() {
 }
 
 // Dashboard Home Component
-function DashboardHome({ stats, liveStatus, history, navigate }) {
+function DashboardHome({ stats, liveStatus, history, navigate, userProfile, loginSession }) {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'online': return 'bg-green-500';
+      case 'offline': return 'bg-red-500';
+      case 'away': return 'bg-yellow-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'online': return 'Online';
+      case 'offline': return 'Offline';
+      case 'away': return 'Away';
+      default: return 'Unknown';
+    }
+  };
+
+  const formatLoginTime = (time) => {
+    if (!time) return 'Never';
+    return new Date(time).toLocaleString();
+  };
+
   return (
     <div className="space-y-8">
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6 hover:border-[#ff6b00]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#ff6b00]/10">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-400 font-medium">Total Prints</h3>
-            <div className="p-2 bg-[#ff6b00]/10 rounded-lg">
-              <FileText className="w-6 h-6 text-[#ff6b00]" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-white">{stats.total}</p>
-          <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-            <TrendingUp className="w-4 h-4" />
-            <span>+12% from last month</span>
-          </div>
-        </div>
+      
+      
 
-        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6 hover:border-[#ff6b00]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#ff6b00]/10">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-400 font-medium">Pending Prints</h3>
-            <div className="p-2 bg-orange-500/10 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-500" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-white">{stats.pending}</p>
-          <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-            <Clock className="w-4 h-4" />
-            <span>Processing now</span>
-          </div>
-        </div>
-
-        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6 hover:border-[#ff6b00]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#ff6b00]/10">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-400 font-medium">Completed Prints</h3>
-            <div className="p-2 bg-green-500/10 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-500" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-white">{stats.completed}</p>
-          <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-            <CheckCircle className="w-4 h-4" />
-            <span>Ready for pickup</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Live Status Card */}
+      {/* Recent Documents - Real-time Updates */}
       <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-          <Printer className="w-5 h-5 text-[#ff6b00]" />
-          Live Status
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center justify-between p-4 bg-[#0f0f0f] rounded-lg border border-gray-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#ff6b00]/10 rounded">
-                <Printer className="w-4 h-4 text-[#ff6b00]" />
-              </div>
-              <span className="font-medium text-gray-300">Token</span>
-            </div>
-            <button
-              onClick={() => navigate("/token")}
-              className="text-[#ff6b00] font-mono font-bold hover:text-[#ff8c00] transition-colors cursor-pointer"
-            >
-              {liveStatus.token}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-[#0f0f0f] rounded-lg border border-gray-800">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded ${
-                liveStatus.status === 'Ready' ? 'bg-green-500/10' : 'bg-orange-500/10'
-              }`}>
-                <AlertCircle className={`w-4 h-4 ${
-                  liveStatus.status === 'Ready' ? 'text-green-500' : 'text-orange-500'
-                }`} />
-              </div>
-              <span className="font-medium text-gray-300">Status</span>
-            </div>
-            <span className={`font-medium ${
-              liveStatus.status === 'Ready' ? 'text-green-500' : 'text-orange-500'
-            }`}>{liveStatus.status}</span>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <FileText className="w-5 h-5 text-[#ff6b00]" />
+            Recent Documents
+          </h3>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-400">Live</span>
           </div>
         </div>
-      </div>
-
-      {/* History Preview */}
-      <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-          <History className="w-5 h-5 text-[#ff6b00]" />
-          Recent History
-        </h3>
         
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">File Name</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Date</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((item) => (
-                <tr key={item.id} className="border-b border-gray-800/50 hover:bg-[#0f0f0f] transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300">{item.file}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-gray-400">{item.date}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+        {history.length === 0 ? (
+          <div className="text-center py-8">
+            <FileText className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400">No documents uploaded yet</p>
+            <p className="text-sm text-gray-500 mt-2">Upload your first document to see it here instantly</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {history.slice(0, 5).map((item, index) => (
+              <div 
+                key={item.id} 
+                className="flex items-center justify-between p-4 bg-[#0f0f0f] rounded-lg border border-gray-800 hover:border-[#ff6b00]/50 transition-all duration-300"
+                style={{
+                  animation: index === 0 ? 'slideIn 0.3s ease-out' : 'none'
+                }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-lg ${
+                    item.status === 'completed' 
+                      ? 'bg-green-500/10' 
+                      : item.status === 'printing'
+                      ? 'bg-orange-500/10'
+                      : 'bg-gray-500/10'
+                  }`}>
+                    <FileText className={`w-4 h-4 ${
                       item.status === 'completed' 
-                        ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                        : 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
-                    }`}>
-                      {item.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        ? 'text-green-500' 
+                        : item.status === 'printing'
+                        ? 'text-orange-500'
+                        : 'text-gray-500'
+                    }`} />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{item.file}</p>
+                    <p className="text-sm text-gray-400">{item.date} · {item.type} · {item.copies} copies</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-400">Rs. {item.price}</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    item.status === 'completed' 
+                      ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                      : item.status === 'printing'
+                      ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
+                      : 'bg-gray-500/10 text-gray-500 border border-gray-500/20'
+                  }`}>
+                    {item.status === 'completed' ? 'Completed' : item.status === 'printing' ? 'Printing' : 'Waiting'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -356,143 +786,6 @@ function HistoryPage({ history }) {
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
-  );
-}
-
-// Notifications Page Component
-function NotificationsPage() {
-  return (
-    <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-8">
-      <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-        <Bell className="w-5 h-5 text-[#ff6b00]" />
-        Notifications
-      </h3>
-      
-      <div className="space-y-4">
-        <div className="bg-[#0f0f0f] rounded-lg p-4 border border-gray-800">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-green-500/10 rounded">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">Print Completed</p>
-              <p className="text-gray-400 text-sm mt-1">Your document "presentation.pptx" is ready for pickup</p>
-              <p className="text-gray-500 text-xs mt-2">2 hours ago</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-[#0f0f0f] rounded-lg p-4 border border-gray-800">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-orange-500/10 rounded">
-              <Clock className="w-4 h-4 text-orange-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">Print Processing</p>
-              <p className="text-gray-400 text-sm mt-1">Your document is currently being processed</p>
-              <p className="text-gray-500 text-xs mt-2">4 hours ago</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Wallet Page Component
-function WalletPage() {
-  return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-[#ff6b00]" />
-            Current Balance
-          </h3>
-          <p className="text-3xl font-bold text-white">₹250.00</p>
-          <p className="text-gray-400 text-sm mt-2">Available for printing</p>
-        </div>
-        
-        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Monthly Spending</h3>
-          <p className="text-3xl font-bold text-white">₹120.50</p>
-          <p className="text-gray-400 text-sm mt-2">April 2024</p>
-        </div>
-      </div>
-      
-      <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Add Funds</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="py-2 px-4 bg-[#0f0f0f] border border-gray-700 rounded-lg text-gray-300 hover:border-[#ff6b00] hover:text-[#ff6b00] transition-all">
-            ₹50
-          </button>
-          <button className="py-2 px-4 bg-[#0f0f0f] border border-gray-700 rounded-lg text-gray-300 hover:border-[#ff6b00] hover:text-[#ff6b00] transition-all">
-            ₹100
-          </button>
-          <button className="py-2 px-4 bg-[#0f0f0f] border border-gray-700 rounded-lg text-gray-300 hover:border-[#ff6b00] hover:text-[#ff6b00] transition-all">
-            ₹200
-          </button>
-          <button className="py-2 px-4 bg-[#0f0f0f] border border-gray-700 rounded-lg text-gray-300 hover:border-[#ff6b00] hover:text-[#ff6b00] transition-all">
-            ₹500
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Profile Page Component
-function ProfilePage() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    // Get user data from localStorage or auth context
-    const authData = localStorage.getItem("secureprint_auth");
-    if (authData) {
-      try {
-        const parsedAuth = JSON.parse(authData);
-        setUser(parsedAuth.user);
-      } catch (error) {
-        console.error("Error parsing auth data:", error);
-      }
-    }
-  }, []);
-
-  const getUserInitials = (name) => {
-    if (!name) return "U";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  return (
-    <div className="p-6">
-      <h2 className="text-xl text-white mb-4">Profile</h2>
-      
-      <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#FF6B35]/20">
-        {/* User Avatar and Info */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#ff6b00] to-[#ff8c00] rounded-full flex items-center justify-center text-white text-xl font-bold">
-            {user ? getUserInitials(user.name) : "U"}
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold text-white">{user?.name || "User"}</h3>
-            <p className="text-gray-400 text-sm">{user?.role || "customer"}</p>
-          </div>
-        </div>
-
-        {/* Profile Details */}
-        <div className="space-y-4">
-          <div className="p-4 bg-[#0f0f0f] rounded-lg border border-gray-800">
-            <p className="text-white"><strong>Name:</strong> {user?.name || "Not available"}</p>
-          </div>
-          <div className="p-4 bg-[#0f0f0f] rounded-lg border border-gray-800">
-            <p className="text-gray-400"><strong>Email:</strong> {user?.email || "Not available"}</p>
-          </div>
-          <div className="p-4 bg-[#0f0f0f] rounded-lg border border-gray-800">
-            <p className="text-gray-400"><strong>Role:</strong> {user?.role || "customer"}</p>
-          </div>
-        </div>
       </div>
     </div>
   );

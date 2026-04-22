@@ -265,14 +265,7 @@ export default function TokenPage() {
       <GlowOrb color="#FF6B35" size={460} top="-8%" left="-6%" />
       <GlowOrb color="#FF8A50" size={340} top="50%" left="60%" delay={2} />
 
-      {/* System tag */}
-      <div className="absolute top-7 left-8 flex items-center gap-2">
-        <Cpu className="w-3.5 h-3.5 opacity-40 text-[#FF6B35]" />
-        <span className="text-[9px] font-black tracking-[0.45em] text-white/20 uppercase">
-          PrivyPrint OS v4.2
-        </span>
-      </div>
-
+      
       {/* Back Button */}
       <motion.button
         initial={{ opacity: 0, x: 10 }}

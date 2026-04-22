@@ -117,14 +117,79 @@ app.use((err, _req, res, _next) => {
     .json({ message: "Internal server error.", error: err.message });
 });
 
+// Socket.io connection handling
+io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
+
+  // Handle user authentication
+  socket.on("authenticate", async (data) => {
+    try {
+      const { userId, role, token } = data;
+
+      if (!userId || !role || !token) {
+        socket.emit("authentication_error", { message: "Missing authentication data" });
+        return;
+      }
+
+      // Join user-specific room for data isolation
+      const userRoom = `user_${userId}`;
+      socket.join(userRoom);
+
+      // Join role-based room for role-specific updates
+      const roleRoom = role === "admin" ? "admin_room" : "customer_room";
+      socket.join(roleRoom);
+
+      // Store user data in socket session
+      socket.userId = userId;
+      socket.role = role;
+      socket.userRoom = userRoom;
+
+      console.log(`User ${userId} (${role}) authenticated and joined room: ${userRoom}`);
+
+      socket.emit("authenticated", {
+        success: true,
+        userId,
+        role,
+        room: userRoom,
+      });
+    } catch (error) {
+      console.error("Socket authentication error:", error);
+      socket.emit("authentication_error", { message: "Authentication failed" });
+    }
+  });
+
+  // Handle disconnection
+  socket.on("disconnect", (reason) => {
+    console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
+    if (socket.userRoom) {
+      console.log(`User ${socket.userId} left room: ${socket.userRoom}`);
+    }
+  });
+});
+
+// Helper function to emit events to specific users
+const emitToUser = (userId, event, data) => {
+  io.to(`user_${userId}`).emit(event, data);
+};
+
+// Helper function to emit events to all users in a role
+const emitToRole = (role, event, data) => {
+  const room = role === "admin" ? "admin_room" : "customer_room";
+  io.to(room).emit(event, data);
+};
+
+// Make emit functions available globally for controllers
+global.emitToUser = emitToUser;
+global.emitToRole = emitToRole;
+global.io = io;
+
 const PORT = process.env.PORT || 5000;
 
 (async () => {
   await connectDB();
 
   httpServer.listen(PORT, () => {
-    // ← was app.listen, now httpServer.listen
     console.log(`SecurePrint backend listening on port ${PORT}`);
-
+    console.log(`Socket.io server running on port ${PORT}`);
   });
 })();

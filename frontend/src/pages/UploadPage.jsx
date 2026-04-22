@@ -147,29 +147,40 @@ export default function UploadPage() {
 
       {/* Upload Form Container - Perfectly Centered */}
       <div className="relative z-10 w-full max-w-2xl px-6 py-12">
-        {/* Back Button */}
-        <motion.button
-          onClick={() => navigate("/home")}
-          className="absolute -top-16 left-0 flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-gray-400 hover:text-[#FF6B35] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back</span>
-        </motion.button>
 
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full"
         >
-          <h1 className="text-5xl md:text-7xl font-bold mb-8 text-[#EAEAEA] leading-tight text-center">
-            Upload <span className="text-[#FF6B35]">Document</span>
-          </h1>
+          {/* Title with Back Button */}
+          <div className="flex items-center mb-8">
+            {/* Back Button - Far Left */}
+            <motion.button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#FF6B35] text-black hover:bg-[#FF8A50] transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">Back</span>
+            </motion.button>
+            
+            {/* Spacer to push title to center */}
+            <div className="flex-1"></div>
+            
+            {/* Centered Title */}
+            <h1 className="text-5xl md:text-7xl font-bold text-[#EAEAEA] leading-tight">
+              Upload <span className="text-[#FF6B35]">Document</span>
+            </h1>
+            
+            {/* Spacer to balance the layout */}
+            <div className="flex-1"></div>
+          </div>
 
           <div className="relative backdrop-blur-xl border border-white/10 rounded-2xl p-8 overflow-hidden bg-white/5 shadow-2xl">
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf,image/*"
+              accept="application/pdf,image/*,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               multiple
               className="hidden"
               onChange={handleFileChange}
@@ -193,7 +204,7 @@ export default function UploadPage() {
                   {files.length === 0 ? "Select your files" : `${files.length} file(s) selected`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  PDF or Images supported (multiple files allowed)
+                  PDF, Images, Word only are allowed
                 </p>
               </div>
             </div>

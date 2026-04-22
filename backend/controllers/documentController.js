@@ -253,6 +253,54 @@ async function uploadDocument(req, res) {
     };
 
     console.log(" Multi-file upload response:", response);
+
+    // Emit real-time events for document creation
+    if (global.emitToUser && req.user.id) {
+      // Document creation event
+      global.emitToUser(req.user.id, 'document_created', {
+        token: documentToken,
+        status: 'waiting',
+        totalFiles: createdDocuments.length,
+        totalPrice: totalPrice,
+        totalCopies: totalCopies,
+        files: createdDocuments.map((doc) => ({
+          id: doc._id,
+          filename: doc.fileUrl.split("/").pop(),
+          type: doc.type,
+          copies: doc.copies,
+          pages: doc.pages,
+          price: doc.price,
+          createdAt: doc.createdAt
+        }))
+      });
+      
+      // User stats update event
+      global.emitToUser(req.user.id, 'user:stats_updated', {
+        stats: {
+          total: createdDocuments.length + 1, // Will be calculated properly on frontend
+          pending: createdDocuments.length,
+          completed: 0
+        }
+      });
+      
+      // History update event
+      global.emitToUser(req.user.id, 'history:updated', {
+        action: 'document_uploaded',
+        documents: createdDocuments,
+        token: documentToken
+      });
+      
+      // New notification event
+      global.emitToUser(req.user.id, 'notification:new', {
+        type: 'success',
+        title: 'Document Uploaded',
+        message: `${createdDocuments.length} file(s) uploaded successfully with token ${documentToken}`,
+        timestamp: new Date()
+      });
+      
+      console.log(`Real-time events emitted: document_created + stats_updated + history_updated + notification:new for user ${req.user.id}`);
+    }
+
     return res.status(201).json(response);
   } catch (err) {
     console.log(" Upload Debug - Upload failed:", err.message);
@@ -372,7 +420,7 @@ async function simulatePrint(req, res) {
       },
       { $set: { status: "printing" } }, //updated doc status to priting
       { new: true },
-    );
+    ).populate("userId", "name email");
 
     if (!printingDoc) {
       const existing = await Document.findOne({
@@ -398,6 +446,44 @@ async function simulatePrint(req, res) {
       return res
         .status(409)
         .json({ message: "Token cannot be printed in its current state." });
+    }
+
+    // Emit real-time events for printing started
+    if (global.emitToUser && printingDoc.userId && printingDoc.userId._id) {
+      // Document printing event
+      global.emitToUser(printingDoc.userId._id, 'document_printing', {
+        token: printingDoc.token,
+        status: 'printing',
+        filename: printingDoc.fileUrl.split("/").pop(),
+        type: printingDoc.type,
+        copies: printingDoc.copies,
+        startedAt: new Date()
+      });
+      
+      // User stats update event
+      global.emitToUser(printingDoc.userId._id, 'user:stats_updated', {
+        stats: {
+          pending: -1, // Decrease pending count
+          printing: 1  // Add to printing count
+        }
+      });
+      
+      // History update event
+      global.emitToUser(printingDoc.userId._id, 'history:updated', {
+        action: 'document_printing',
+        document: printingDoc,
+        token: printingDoc.token
+      });
+      
+      // New notification event
+      global.emitToUser(printingDoc.userId._id, 'notification:new', {
+        type: 'info',
+        title: 'Print Started',
+        message: `Your document "${printingDoc.fileUrl.split("/").pop()}" is now being printed`,
+        timestamp: new Date()
+      });
+      
+      console.log(`Real-time events emitted: document_printing + stats_updated + history_updated + notification:new for user ${printingDoc.userId._id}`);
     }
 
     // Simulate printing time.
@@ -435,6 +521,54 @@ async function simulatePrint(req, res) {
 
     // Send print success email with rating links
     await sendPrintSuccessEmail(completedDoc);
+
+    // Emit real-time events for document completion
+    if (global.emitToUser && completedDoc.userId && completedDoc.userId._id) {
+      // Document completion event
+      global.emitToUser(completedDoc.userId._id, 'document_completed', {
+        token: completedDoc.token,
+        status: 'completed',
+        filename: completedDoc.fileUrl.split("/").pop(),
+        type: completedDoc.type,
+        copies: completedDoc.copies,
+        price: completedDoc.price,
+        completedAt: new Date(),
+        documentId: completedDoc._id
+      });
+      
+      // User stats update event
+      global.emitToUser(completedDoc.userId._id, 'user:stats_updated', {
+        stats: {
+          completed: 1, // Increase completed count
+          printing: -1  // Decrease printing count
+        }
+      });
+      
+      // User wallet update event
+      global.emitToUser(completedDoc.userId._id, 'user:wallet_updated', {
+        walletData: {
+          monthlySpending: completedDoc.price || 0
+        },
+        message: `Document "${completedDoc.fileUrl.split("/").pop()}" completed. Rs. ${completedDoc.price || 0} added to monthly spending.`
+      });
+      
+      // History update event
+      global.emitToUser(completedDoc.userId._id, 'history:updated', {
+        action: 'document_completed',
+        document: completedDoc,
+        token: completedDoc.token
+      });
+      
+      // New notification event
+      global.emitToUser(completedDoc.userId._id, 'notification:new', {
+        type: 'success',
+        title: 'Print Completed',
+        message: `Your document "${completedDoc.fileUrl.split("/").pop()}" is ready for pickup`,
+        timestamp: new Date()
+      });
+      
+      console.log(`Real-time events emitted: document_completed + stats_updated + wallet_updated + history_updated + notification:new for user ${completedDoc.userId._id}`);
+    }
 
     return res.status(200).json({
       message: "Printing completed.",
@@ -972,6 +1106,31 @@ async function getEarningsHistory(req, res) {
   }
 }
 
+async function getUserDocumentHistory(req, res) {
+  try {
+    const userId = req.user.id;
+    console.log(`Fetching document history for user: ${userId}`);
+
+    const documents = await Document.find({ userId })
+      .sort({ createdAt: -1 }) // Most recent first
+      .limit(50); // Limit to last 50 documents
+
+    console.log(`Found ${documents.length} documents for user ${userId}`);
+
+    return res.status(200).json({
+      success: true,
+      documents: documents,
+      count: documents.length
+    });
+  } catch (err) {
+    console.error("Failed to fetch user document history:", err);
+    return res.status(500).json({
+      message: "Failed to fetch document history.",
+      error: err.message,
+    });
+  }
+}
+
 module.exports = {
   uploadDocument,
   getDocumentByToken,
@@ -985,4 +1144,5 @@ module.exports = {
   getDailyRevenue,
   getRealTimeStats,
   getEarningsHistory,
+  getUserDocumentHistory,
 };

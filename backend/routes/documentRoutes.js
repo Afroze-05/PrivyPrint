@@ -123,6 +123,14 @@ router.get(
   documentController.getDocumentById,
 );
 
+// Get user document history (customer only)
+router.get(
+  "/documents/user/history",
+  authMiddleware,
+  requireRole("customer"),
+  documentController.getUserDocumentHistory,
+);
+
 // Simulate printing flow waiting -> printing -> completed (admin only).
 router.post(
   "/print/:token",

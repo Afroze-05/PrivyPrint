@@ -194,8 +194,8 @@ const getRatingEmailTemplate = (userName, jobDetails, ratingUrl) => {
               Or click the button below for detailed rating:
             </p>
             
-            <a href="${backendUrl}/api/rate?jobId=${jobDetails.jobId}" class="cta-button">
-              ⭐ Rate Your Experience
+            <a href="${ratingUrl}" class="cta-button">
+              Rate Your Experience
             </a>
           </div>
           

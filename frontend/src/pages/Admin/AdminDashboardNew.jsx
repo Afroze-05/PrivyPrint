@@ -178,10 +178,7 @@ export default function AdminDashboardNew() {
   const [realTimeLoading, setRealTimeLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const [chartData, setChartData] = useState([]);
-  const [dateFilter, setDateFilter] = useState("7days");
-  const [chartLoading, setChartLoading] = useState(false);
-
+  
   const [activeTab, setActiveTab] = useState("dashboard");
 
   // ── FIX: ratingsKey MUST be inside the component function ──
@@ -323,7 +320,6 @@ export default function AdminDashboardNew() {
         const newAuth = { ...currentAuth, trustScore: res.data.trustScore };
         localStorage.setItem("auth", JSON.stringify(newAuth));
       }
-      await loadChartData(dateFilter);
     } catch (err) {
       console.log(err);
       setError("Failed to load dashboard data");
@@ -424,19 +420,6 @@ export default function AdminDashboardNew() {
     }
   }
 
-  async function loadChartData(filter) {
-    setChartLoading(true);
-    try {
-      const res = await api.get(`/stats/charts?filter=${filter}`);
-      setChartData(res.data);
-    } catch (err) {
-      console.error("Failed to load chart data:", err);
-      setChartData([]);
-    } finally {
-      setChartLoading(false);
-    }
-  }
-
   // Initial data load
   useEffect(() => {
     loadStats();
@@ -453,19 +436,13 @@ export default function AdminDashboardNew() {
     return () => clearInterval(interval);
   }, []);
 
-  // Stats + charts refresh every 60s
+  // Stats refresh every 60s
   useEffect(() => {
     const interval = setInterval(() => {
       loadStats();
-      loadChartData(dateFilter);
     }, 60000);
     return () => clearInterval(interval);
-  }, [dateFilter]);
-
-  // Reload charts when filter changes
-  useEffect(() => {
-    if (stats) loadChartData(dateFilter);
-  }, [dateFilter, stats]);
+  }, []);
 
   // Load print history when tab opens
   useEffect(() => {
@@ -871,170 +848,6 @@ export default function AdminDashboardNew() {
                     </div>
                   ))}
                 </div>
-              </motion.div>
-
-              {/* Date Filter + Charts */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="mb-8"
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-white">
-                    Activity Overview
-                  </h2>
-                  <div className="flex gap-2">
-                    {["today", "7days", "30days"].map((filter) => (
-                      <motion.button
-                        key={filter}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setDateFilter(filter)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dateFilter === filter ? "bg-[#FF6B35] text-white" : "bg-white/10 text-gray-400 hover:bg-white/20"}`}
-                      >
-                        {filter === "today"
-                          ? "Today"
-                          : filter === "7days"
-                            ? "7 Days"
-                            : "30 Days"}
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
-                {chartLoading ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {[0, 1].map((i) => (
-                      <div
-                        key={i}
-                        className="backdrop-blur-xl border border-white/10 rounded-2xl p-8"
-                      >
-                        <div className="flex items-center justify-center h-64">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B35]" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.6 }}
-                      className="backdrop-blur-xl border border-white/10 rounded-2xl p-6"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-[#FF6B35]" /> Print
-                          Activity
-                        </h3>
-                        {chartData.length > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-gray-400">
-                            <TrendingUp className="w-3 h-3 text-green-400" />
-                            <span>Live</span>
-                          </div>
-                        )}
-                      </div>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={chartData}>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(255,255,255,0.1)"
-                          />
-                          <XAxis
-                            dataKey="date"
-                            stroke="#999999"
-                            tick={{ fill: "#999999", fontSize: 12 }}
-                          />
-                          <YAxis
-                            stroke="#999999"
-                            tick={{ fill: "#999999", fontSize: 12 }}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#1a1a1a",
-                              border: "1px solid rgba(255,107,53,0.3)",
-                              borderRadius: "8px",
-                            }}
-                          />
-                          <Legend />
-                          <Line
-                            type="monotone"
-                            dataKey="prints"
-                            stroke="#FF6B35"
-                            strokeWidth={3}
-                            dot={{ fill: "#FF6B35", r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="users"
-                            stroke="#FF8A50"
-                            strokeWidth={2}
-                            dot={{ fill: "#FF8A50", r: 3 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.7 }}
-                      className="backdrop-blur-xl border border-white/10 rounded-2xl p-6"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                          <BarChart2 className="w-5 h-5 text-[#FFA05B]" /> Daily
-                          Print Volume
-                        </h3>
-                        <div className="text-xs text-gray-400">
-                          {dateFilter === "today"
-                            ? "Today"
-                            : dateFilter === "7days"
-                              ? "Last 7 Days"
-                              : "Last 30 Days"}
-                        </div>
-                      </div>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={chartData}>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(255,255,255,0.1)"
-                          />
-                          <XAxis
-                            dataKey="date"
-                            stroke="#999999"
-                            tick={{ fill: "#999999", fontSize: 12 }}
-                          />
-                          <YAxis
-                            stroke="#999999"
-                            tick={{ fill: "#999999", fontSize: 12 }}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#1a1a1a",
-                              border: "1px solid rgba(255,107,53,0.3)",
-                              borderRadius: "8px",
-                            }}
-                          />
-                          <Legend />
-                          <Bar
-                            dataKey="prints"
-                            fill="#FF6B35"
-                            radius={[8, 8, 0, 0]}
-                          />
-                          <Bar
-                            dataKey="uploads"
-                            fill="#FFA05B"
-                            radius={[8, 8, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </motion.div>
-                  </div>
-                )}
               </motion.div>
             </>
           )}

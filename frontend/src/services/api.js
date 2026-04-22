@@ -50,3 +50,6 @@ export function authHeader(token) {
   return { Authorization: `Bearer ${token}` };
 }
 
+// Default export for compatibility
+export default api;
+

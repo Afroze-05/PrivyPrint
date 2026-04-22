@@ -538,7 +538,7 @@ export default function PhoneDetection({ existingVideoRef }) {
         )}
 
         {/* Debug info (remove in production) */}
-        {process.env.NODE_ENV === "development" && (
+        {import.meta.env.DEV && (
           <div
             style={{
               position: "fixed",

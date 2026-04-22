@@ -15,9 +15,34 @@ export default function CustomerSignup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Password validation function
+  const validatePassword = (password) => {
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasAlphabet = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasSpecialChar || !hasAlphabet || !hasNumber) {
+      return "Password must contain at least one special character, one letter, and one number";
+    }
+    
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long";
+    }
+    
+    return "";
+  };
+
   async function handleCreateAccount(e) {
-    e.preventDefault();   //Don’t refresh page" 
+    e.preventDefault();   //Don't refresh page" 
     setError("");         //Clear old warning message
+    
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    
     setLoading(true);     //Show processing... and spinning
     try {
       console.log("Signup attempt:", { name, email, password, role: "customer" });
@@ -43,6 +68,14 @@ export default function CustomerSignup() {
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
+    
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    
     setLoading(true);
     try {
       const loginRes = await api.post("/auth/login", { email, password });
@@ -269,7 +302,7 @@ export default function CustomerSignup() {
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={20} />
                           <input
                             type="password"
-                            placeholder={isLogin ? "Password" : "Create a password"}
+                            placeholder={isLogin ? "Password (special char + letter + number)" : "Create a password (special char + letter + number)"}
                             className="w-full pl-12 pr-4 py-4 bg-white/4 border border-white/10 text-white placeholder-white/40 rounded-xl focus:outline-none focus:border-orange-500 focus:shadow-lg focus:shadow-orange-500/20 transition-all duration-300"
                             style={{
                               fontFamily: '"Inter", sans-serif'

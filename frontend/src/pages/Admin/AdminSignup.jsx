@@ -23,10 +23,35 @@ export default function AdminSignup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Password validation function
+  const validatePassword = (password) => {
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasAlphabet = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasSpecialChar || !hasAlphabet || !hasNumber) {
+      return "Password must contain at least one special character, one letter, and one number";
+    }
+    
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long";
+    }
+    
+    return "";
+  };
+
   // Inside AdminSignup.js
   async function handleCreateAccount(e) {
     e.preventDefault();
     setError("");
+    
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    
     setLoading(true);
     try {
       await api.post("/auth/signup", { name, email, password, role: "admin" });
@@ -291,7 +316,7 @@ export default function AdminSignup() {
                       />
                       <input
                         type="password"
-                        placeholder="Create strong password"
+                        placeholder="Create strong password (special char + letter + number)"
                         className="w-full pl-12 pr-4 py-4 bg-white/3 border border-white/8 text-white placeholder-white/30 rounded-xl focus:outline-none focus:border-red-500 focus:shadow-lg focus:shadow-red-500/25 transition-all duration-300"
                         style={{
                           fontFamily: '"Inter", sans-serif',

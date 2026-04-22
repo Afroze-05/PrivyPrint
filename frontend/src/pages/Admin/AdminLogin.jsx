@@ -22,10 +22,35 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Password validation function
+  const validatePassword = (password) => {
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasAlphabet = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasSpecialChar || !hasAlphabet || !hasNumber) {
+      return "Password must contain at least one special character, one letter, and one number";
+    }
+    
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long";
+    }
+    
+    return "";
+  };
+
 
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
+    
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    
     setLoading(true);
     try {
 
@@ -216,7 +241,7 @@ export default function AdminLogin() {
                     color: "#EAEAEA",
                     fontFamily: '"Inter", sans-serif',
                   }}
-                  placeholder="Enter your password"
+                  placeholder="Enter your password (special char + letter + number)"
                 />
                 <button
                   type="button"

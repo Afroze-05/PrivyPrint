@@ -3,6 +3,42 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 
+// Helper function to parse user agent string for device information
+function parseUserAgent(userAgent) {
+  const ua = userAgent.toLowerCase();
+  
+  // Detect browser
+  let browser = 'Unknown';
+  if (ua.includes('chrome')) browser = 'Chrome';
+  else if (ua.includes('firefox')) browser = 'Firefox';
+  else if (ua.includes('safari')) browser = 'Safari';
+  else if (ua.includes('edge')) browser = 'Edge';
+  else if (ua.includes('opera')) browser = 'Opera';
+  
+  // Detect OS
+  let os = 'Unknown';
+  if (ua.includes('windows')) os = 'Windows';
+  else if (ua.includes('mac')) os = 'macOS';
+  else if (ua.includes('linux')) os = 'Linux';
+  else if (ua.includes('android')) os = 'Android';
+  else if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) os = 'iOS';
+  
+  // Detect device type
+  let deviceType = 'Desktop';
+  if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
+    deviceType = 'Mobile';
+  } else if (ua.includes('tablet') || ua.includes('ipad')) {
+    deviceType = 'Tablet';
+  }
+  
+  return {
+    browser,
+    os,
+    deviceType,
+    userAgent: userAgent
+  };
+}
+
 // Helper to sign JWT
 function signJWT(user) {
   const payload = { id: user._id.toString(), role: user.role };
@@ -196,6 +232,55 @@ async function login(req, res) {
 
     const token = signJWT(user);
 
+    // Extract device and session information
+    const userAgent = req.headers['user-agent'] || '';
+    const ip = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown';
+    
+    // Parse user agent for device info
+    const deviceInfo = parseUserAgent(userAgent);
+    
+    // Update user's last login
+    await User.findByIdAndUpdate(user._id, {
+      lastLogin: new Date(),
+      lastLoginIP: ip,
+      lastLoginDevice: deviceInfo,
+      isOnline: true
+    });
+
+    // Emit real-time login success event
+    if (global.emitToUser && user._id) {
+      global.emitToUser(user._id, 'login:success', {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          trustScore: user.trustScore,
+          isOnline: true,
+          lastLogin: new Date()
+        },
+        session: {
+          loginTime: new Date(),
+          status: 'active',
+          device: deviceInfo,
+          ip: ip,
+          userAgent: userAgent
+        },
+        timestamp: new Date()
+      });
+
+      // Emit session update event
+      global.emitToUser(user._id, 'session:update', {
+        status: 'active',
+        loginTime: new Date(),
+        device: deviceInfo,
+        ip: ip,
+        lastActivity: new Date()
+      });
+
+      console.log(`Real-time events emitted: login:success + session:update for user ${user._id}`);
+    }
+
     return res.status(200).json({
       token,
       user: {
@@ -204,6 +289,8 @@ async function login(req, res) {
         email: user.email,
         role: user.role,
         trustScore: user.trustScore,
+        isOnline: true,
+        lastLogin: new Date()
       },
     });
   } catch (err) {
@@ -265,7 +352,158 @@ async function verifyToken(req, res) {
   }
 }
 
-// 5. DEV ONLY: Clear users
+// 5. UPDATE PROFILE: Update user profile with real-time socket emission
+async function updateProfile(req, res) {
+  try {
+    const userId = req.user.id;
+    const { name, email } = req.body;
+
+    if (!name && !email) {
+      return res.status(400).json({ message: "At least name or email must be provided." });
+    }
+
+    // Find user and update
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Check if email is being changed and if it's already taken
+    if (email && email !== user.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Invalid email format." });
+      }
+
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+      if (existingUser) {
+        return res.status(409).json({ message: "Email already registered." });
+      }
+    }
+
+    // Update user profile
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email.toLowerCase().trim();
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    // Emit real-time profile update event
+    if (global.emitToUser && userId) {
+      global.emitToUser(userId, 'profile:update', {
+        user: {
+          id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          trustScore: updatedUser.trustScore,
+          isVerified: updatedUser.isVerified,
+          updatedAt: updatedUser.updatedAt
+        },
+        timestamp: new Date()
+      });
+
+      // Emit user data updated event for broader updates
+      global.emitToUser(userId, 'user:data_updated', {
+        user: {
+          id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          trustScore: updatedUser.trustScore,
+          isVerified: updatedUser.isVerified
+        }
+      });
+
+      // Emit notification for profile update
+      global.emitToUser(userId, 'notification:new', {
+        type: 'success',
+        title: 'Profile Updated',
+        message: 'Your profile has been successfully updated',
+        timestamp: new Date()
+      });
+
+      console.log(`Real-time events emitted: profile:update + user:data_updated + notification:new for user ${userId}`);
+    }
+
+    return res.status(200).json({
+      message: "Profile updated successfully.",
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        trustScore: updatedUser.trustScore,
+        isVerified: updatedUser.isVerified,
+        updatedAt: updatedUser.updatedAt
+      }
+    });
+
+  } catch (err) {
+    console.error("Profile update error:", err);
+    return res.status(500).json({ 
+      message: "Profile update failed.", 
+      error: err.message 
+    });
+  }
+}
+
+// 6. LOGOUT: Handle user logout with real-time socket emission
+async function logout(req, res) {
+  try {
+    const userId = req.user.id;
+    
+    // Update user's online status and logout time
+    await User.findByIdAndUpdate(userId, {
+      isOnline: false,
+      lastLogout: new Date()
+    });
+
+    // Emit real-time logout event
+    if (global.emitToUser && userId) {
+      global.emitToUser(userId, 'logout:event', {
+        user: {
+          id: userId,
+          isOnline: false,
+          lastLogout: new Date()
+        },
+        session: {
+          status: 'inactive',
+          logoutTime: new Date(),
+          lastActivity: new Date()
+        },
+        timestamp: new Date()
+      });
+
+      // Emit session update event
+      global.emitToUser(userId, 'session:update', {
+        status: 'inactive',
+        logoutTime: new Date(),
+        lastActivity: new Date()
+      });
+
+      console.log(`Real-time events emitted: logout:event + session:update for user ${userId}`);
+    }
+
+    return res.status(200).json({
+      message: "Logout successful.",
+      timestamp: new Date()
+    });
+
+  } catch (err) {
+    console.error("Logout error:", err);
+    return res.status(500).json({ 
+      message: "Logout failed.", 
+      error: err.message 
+    });
+  }
+}
+
+// 7. DEV ONLY: Clear users
 const deleteAllUsers = async (req, res) => {
   try {
     const result = await User.deleteMany({});
@@ -280,4 +518,4 @@ const deleteAllUsers = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, verifyOTP, verifyToken, deleteAllUsers };
+module.exports = { signup, login, verifyOTP, verifyToken, updateProfile, logout, deleteAllUsers };
